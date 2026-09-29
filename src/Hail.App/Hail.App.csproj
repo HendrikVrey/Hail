@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The box, the tray and the composition root. No decisions live here that a test could make
+    without a window: matching and ranking are Hail.Core's, every Win32 and COM call is
+    Hail.Windows', and the log is Hail.Persistence's. ArchitectureTests holds this project to
+    naming no Process, no AssemblyLoadContext and no OleDb.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Hail.App</RootNamespace>
+    <AssemblyName>Hail</AssemblyName>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>false</UseWindowsForms>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <DebugType>embedded</DebugType>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!--
+      Embedded as a Win32 resource (id 32512), which is the only copy in the product: the tray
+      icon loads it from the executable at the notification area's own size, and Explorer
+      shows it. assets/build-icon.py regenerates it from geometry.
+    -->
+    <ApplicationIcon>..\..\assets\hail.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Publish">
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <!-- WPF resolves XAML types by reflection and cannot be trimmed or compiled NativeAOT;
+         NativeAOT would also forbid the plugin loading of M2 (Hail.md §4). -->
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WPF-UI" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- For a window harness that builds the real box off screen (tooling: named after the
+         test project so internals and x:Name fields are reachable without reflection). -->
+    <InternalsVisibleTo Include="Hail.App.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hail.Sdk\Hail.Sdk.csproj" />
+    <ProjectReference Include="..\Hail.Core\Hail.Core.csproj" />
+    <ProjectReference Include="..\Hail.Providers\Hail.Providers.csproj" />
+    <ProjectReference Include="..\Hail.Windows\Hail.Windows.csproj" />
+    <ProjectReference Include="..\Hail.Persistence\Hail.Persistence.csproj" />
+  </ItemGroup>
+
+</Project>

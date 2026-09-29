@@ -1,0 +1,24 @@
+<Project>
+
+  <!--
+    Central package management. Versions live here only; csproj files reference packages by
+    name with no Version attribute. Versions are Etch's and Sling's, which are known-good on
+    net10.0-windows.
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup Label="UI">
+    <PackageVersion Include="WPF-UI" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Testing">
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.5.1" />
+    <!-- 3.2.2, not 4.x: on Signet 4.0.0 made `dotnet test` report zero tests while green. -->
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+
+</Project>

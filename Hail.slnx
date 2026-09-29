@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/solution items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path=".editorconfig" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Hail.Sdk/Hail.Sdk.csproj" />
+    <Project Path="src/Hail.Core/Hail.Core.csproj" />
+    <Project Path="src/Hail.Providers/Hail.Providers.csproj" />
+    <Project Path="src/Hail.Windows/Hail.Windows.csproj" />
+    <Project Path="src/Hail.Persistence/Hail.Persistence.csproj" />
+    <Project Path="src/Hail.App/Hail.App.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Hail.Core.Tests/Hail.Core.Tests.csproj" />
+    <Project Path="tests/Hail.Providers.Tests/Hail.Providers.Tests.csproj" />
+    <Project Path="tests/Hail.Windows.Tests/Hail.Windows.Tests.csproj" />
+    <Project Path="tests/Hail.Persistence.Tests/Hail.Persistence.Tests.csproj" />
+  </Folder>
+</Solution>

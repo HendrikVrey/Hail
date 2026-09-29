@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Pure: matching, ranking, the result list, and the ports first-party providers talk to the
+    host through. No I/O, no interop, no process, no UI, and no PackageReference, which
+    ArchitectureTests holds it to. That is what lets the code that decides what the user sees
+    be tested exhaustively without a window.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Hail.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hail.Sdk\Hail.Sdk.csproj" />
+  </ItemGroup>
+
+</Project>

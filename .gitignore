@@ -1,0 +1,28 @@
+## Build output
+[Bb]in/
+[Oo]bj/
+artifacts/
+TestResults/
+*.binlog
+
+## Release output. A committed build is a redistributed binary, which the licence is
+## about, so this is not only tidiness.
+publish/
+dist/
+
+## Visual Studio / Rider / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+*.userprefs
+launchSettings.json
+
+## NuGet
+*.nupkg
+packages/
+
+## OS
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -1,0 +1,21 @@
+<Application
+  x:Class="Hail.App.App"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+  ShutdownMode="OnExplicitShutdown">
+  <!--
+    OnExplicitShutdown: Hail is resident. Its only window is hidden most of the time, and
+    closing it must never end the process; Quit in the tray does.
+  -->
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <!-- Replaced by the system theme at startup (ApplicationThemeManager.ApplySystemTheme). -->
+        <ui:ThemesDictionary Theme="Dark" />
+        <ui:ControlsDictionary />
+        <ResourceDictionary Source="Theme/Box.xaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>

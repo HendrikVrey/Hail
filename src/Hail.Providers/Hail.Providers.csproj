@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The first-party providers. Each is written against Hail.Sdk exactly as a stranger's plugin
+    would be, plus a port or two from Hail.Core.Ports passed in by interface. ArchitectureTests
+    holds this project to that: nothing else from Hail.Core, no Process, no interop, no disk.
+    If a built-in provider needs something the SDK does not offer, the SDK grows, in public
+    (Hail.md §6.1).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Hail.Providers</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hail.Sdk\Hail.Sdk.csproj" />
+    <ProjectReference Include="..\Hail.Core\Hail.Core.csproj" />
+  </ItemGroup>
+
+</Project>

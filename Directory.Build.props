@@ -1,0 +1,42 @@
+<Project>
+
+  <PropertyGroup Label="Language">
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <!--
+      Warnings stay warnings, as in Etch and Sling. The discipline that replaces the flag:
+      the solution stays at zero warnings, and any rule switched off is switched off at its
+      site with a written reason, or in tests/.editorconfig for rules that only apply to
+      test code. No blanket NoWarn anywhere, so a warning in a build is news.
+    -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Identity">
+    <Product>Hail</Product>
+    <Company>Hendrik Vrey</Company>
+    <Authors>Hendrik Vrey</Authors>
+    <Copyright>Copyright (c) 2026 Hendrik Vrey</Copyright>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Runtime">
+    <!-- Globalization-invariant mode silently breaks culture lookups; the calculator (M1)
+         reads the culture's decimal separator, so this is load-bearing here. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Repro">
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+</Project>

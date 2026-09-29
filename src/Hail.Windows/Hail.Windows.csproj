@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Every P/Invoke and COM call in Hail: the hotkey, the AppsFolder, icons, the backdrop, the
+    tray icon, the monitor under the cursor, and the one place a process is started. Keeping
+    all of it here is what makes the interop reviewable by reading one project, and
+    ArchitectureTests holds every other project to that.
+
+    No WPF: this project hands the UI plain data (pixels, rectangles, error codes), so the
+    choice of UI framework stays in Hail.App.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Hail.Windows</RootNamespace>
+    <!-- LibraryImport with blittable structs (the tray icon's fixed-size text buffers). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hail.Core\Hail.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Hail.Windows.Tests" />
+  </ItemGroup>
+
+</Project>
