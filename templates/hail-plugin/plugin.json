@@ -1,0 +1,24 @@
+{
+  // What Hail reads before it loads any of your code. docs/plugins.md in Hail's repository
+  // explains every field.
+  "id": "yourname.myplugin",
+  "name": "HailPlugin1",
+  "publisher": "Your Name",
+  "version": "1.0.0",
+  "sdk": "1.0",
+  "entry": "HailPlugin1.dll",
+  "type": "HailPlugin1.Provider",
+  "description": "Says hello to whatever you type after its keyword.",
+  "keywords": [ "hello-keyword" ],
+  // false: only after the keyword. true: every search as well.
+  "global": false,
+  "settings": [
+    {
+      "key": "greeting",
+      "type": "text",
+      "label": "Greeting",
+      "description": "The word it greets with.",
+      "default": "Hello"
+    }
+  ]
+}

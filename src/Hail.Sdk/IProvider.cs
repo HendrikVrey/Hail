@@ -17,6 +17,13 @@ namespace Hail.Sdk;
 /// A result's actions (<see cref="ResultAction.Execute"/>) also run on a background thread,
 /// with a token that is cancelled when the host stops waiting for them.
 /// </para>
+/// <para>
+/// A plugin's provider is made with its public constructor that takes no arguments. If it
+/// implements <see cref="IAsyncDisposable"/> or <see cref="IDisposable"/>, the host disposes
+/// it when the plugin is unloaded (Reload plugins in the tray) and when Hail quits. Stop any
+/// thread or timer there and unhook any event of the host's or of .NET's: anything still
+/// running, or still referenced from outside the plugin, keeps it in memory after an unload.
+/// </para>
 /// </remarks>
 public interface IProvider
 {
@@ -72,15 +79,20 @@ public abstract record Recollection
     /// <summary>It cannot be told now; the host shows nothing and forgets nothing.</summary>
     public static Recollection Unknown { get; } = new UnknownRecollection();
 
+    /// <summary>It is there, and this is it as a query would produce it now.</summary>
     public static Recollection Of(Result result)
     {
         ArgumentNullException.ThrowIfNull(result);
         return new Found(result);
     }
 
+    /// <summary>The result rebuilt: <see cref="Of"/>.</summary>
+    /// <param name="Result">The rebuilt result.</param>
     public sealed record Found(Result Result) : Recollection;
 
+    /// <summary>It no longer exists: <see cref="Gone"/>.</summary>
     public sealed record GoneRecollection : Recollection;
 
+    /// <summary>It cannot be told now: <see cref="Unknown"/>.</summary>
     public sealed record UnknownRecollection : Recollection;
 }

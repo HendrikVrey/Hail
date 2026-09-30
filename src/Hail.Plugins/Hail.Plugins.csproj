@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The host side of plugins (Hail.md §6.3): finding them, fingerprinting their files, loading
+    each into a collectible AssemblyLoadContext of its own, and unloading it again. The only
+    project that names AssemblyLoadContext or loads code from a path, which ArchitectureTests
+    holds every other project to.
+
+    No UI and no interop: the consent and the settings form are Hail.App's, and a plugin's own
+    native calls are its own business, not the host's.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Hail.Plugins</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hail.Sdk\Hail.Sdk.csproj" />
+    <ProjectReference Include="..\Hail.Core\Hail.Core.csproj" />
+    <ProjectReference Include="..\Hail.Persistence\Hail.Persistence.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Hail.Plugins.Tests" />
+  </ItemGroup>
+
+</Project>

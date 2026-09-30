@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A plugin for the loader's tests, built as a stranger's would be. Its types are chosen by
+    each test's plugin.json: a working provider, one whose constructor throws, a class that is
+    not a provider, and one that leaves a thread running so it can never be unloaded.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Hail.Sdk\Hail.Sdk.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\Hail.TestShared.V1\Hail.TestShared.V1.csproj" />
+  </ItemGroup>
+
+</Project>

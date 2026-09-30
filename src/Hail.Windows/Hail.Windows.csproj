@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <PackageReference Include="System.Data.OleDb" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
   </ItemGroup>
 
   <ItemGroup>

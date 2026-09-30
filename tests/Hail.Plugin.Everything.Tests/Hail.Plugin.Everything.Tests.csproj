@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Everything plugin's own tests: the IPC's byte layout, the provider over a fake
+    Everything, and the client's reply window against a fake Everything window. Real
+    Everything is not installed on the machine these were written on (Hail.md §19).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Hail.Plugin.Everything.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Here the SDK is needed at run time: the tests host the provider themselves. -->
+    <ProjectReference Include="..\..\src\Hail.Sdk\Hail.Sdk.csproj" />
+    <ProjectReference Include="..\..\plugins\Hail.Plugin.Everything\Hail.Plugin.Everything.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

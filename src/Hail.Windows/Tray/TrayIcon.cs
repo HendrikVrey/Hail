@@ -12,6 +12,9 @@ public enum TrayEvent
 
     /// <summary>Right-clicked, or Shift+F10 / the menu key.</summary>
     ContextMenu,
+
+    /// <summary>The last notification was clicked.</summary>
+    NotificationClicked,
 }
 
 /// <summary>
@@ -38,6 +41,7 @@ public sealed class TrayIcon : IDisposable
     private const uint IconId = 1;
     private const int NinSelect = 0x0400;
     private const int NinKeySelect = 0x0401;
+    private const int NinBalloonUserClick = 0x0405;
     private const int WmContextMenu = 0x007B;
 
     /// <summary>The resource id the .NET SDK gives an ApplicationIcon (IDI_APPLICATION).</summary>
@@ -65,6 +69,7 @@ public sealed class TrayIcon : IDisposable
     {
         NinSelect or NinKeySelect => TrayEvent.Select,
         WmContextMenu => TrayEvent.ContextMenu,
+        NinBalloonUserClick => TrayEvent.NotificationClicked,
         _ => TrayEvent.None,
     };
 
@@ -75,13 +80,16 @@ public sealed class TrayIcon : IDisposable
         Add();
     }
 
-    /// <summary>A balloon notification from the icon, for things the user needs to know once.</summary>
-    public unsafe void Notify(string title, string text)
+    /// <summary>
+    /// A notification from the icon, for things the user needs to know once: a warning (the
+    /// hotkey is taken), or news (a plugin is waiting for an answer).
+    /// </summary>
+    public unsafe void Notify(string title, string text, bool warning = true)
     {
         var data = NewData(Shell32.NIF_INFO);
         Copy(title, data.InfoTitle, 64);
         Copy(text, data.Info, 256);
-        data.InfoFlags = Shell32.NIIF_WARNING;
+        data.InfoFlags = warning ? Shell32.NIIF_WARNING : Shell32.NIIF_INFO;
         Shell32.Shell_NotifyIcon(Shell32.NIM_MODIFY, ref data);
     }
 

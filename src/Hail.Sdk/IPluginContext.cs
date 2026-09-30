@@ -5,13 +5,9 @@ namespace Hail.Sdk;
 /// one reaches for nothing else: launching goes through <see cref="Launcher"/> so the host's
 /// rules apply to it (Hail.md §9).
 /// </summary>
-/// <remarks>
-/// SDK 0.2 carries what the four built-in providers need. Settings, a data folder and read
-/// access to history arrive with plugins (M2); the contract grows in public rather than being
-/// guessed at ahead of use.
-/// </remarks>
 public interface IPluginContext
 {
+    /// <summary>Starts apps and opens addresses, files and folders, under the host's rules.</summary>
     ILauncher Launcher { get; }
 
     /// <summary>
@@ -20,9 +16,32 @@ public interface IPluginContext
     /// </summary>
     IMatcher Matcher { get; }
 
+    /// <summary>Puts text or a file on the Windows clipboard.</summary>
     IClipboard Clipboard { get; }
 
+    /// <summary>Writes into Hail's log, each line marked with the provider's id.</summary>
     IPluginLog Log { get; }
+
+    /// <summary>
+    /// The values of the settings the plugin declares in its manifest, as the user has set
+    /// them. They can change while Hail runs, so read them when they are needed rather than
+    /// once at start.
+    /// </summary>
+    IPluginSettings Settings { get; }
+
+    /// <summary>
+    /// What the user picks from this provider most, for a provider that implements
+    /// <see cref="IRecall"/>; empty for one that does not, because nothing it offers is
+    /// remembered.
+    /// </summary>
+    IPluginHistory History { get; }
+
+    /// <summary>
+    /// A folder of the provider's own under the user's profile, for a cache or a small
+    /// database. The host creates it the first time this is read. Nothing else writes there,
+    /// and deleting it loses only what the provider kept.
+    /// </summary>
+    string DataFolder { get; }
 }
 
 /// <summary>
@@ -64,6 +83,7 @@ public interface ILauncher
 /// <summary>Puts things on the Windows clipboard.</summary>
 public interface IClipboard
 {
+    /// <summary>Puts <paramref name="text"/> on the clipboard as plain text.</summary>
     ValueTask SetTextAsync(string text, CancellationToken ct);
 
     /// <summary>
@@ -87,7 +107,48 @@ public interface IMatcher
 /// <remarks>Never log what the user typed; the host's log never does (Hail.md §9).</remarks>
 public interface IPluginLog
 {
+    /// <summary>Records something that happened.</summary>
     void LogInfo(string message);
 
+    /// <summary>Records a failure. The exception's type and stack are kept, never its message.</summary>
     void LogError(string message, Exception? exception = null);
+}
+
+/// <summary>
+/// The settings a plugin declared in its manifest's <c>settings</c> list, as the user has set
+/// them in Hail. Each is read by its key, with the method for its kind.
+/// </summary>
+/// <remarks>
+/// Asking for a key the manifest does not declare, or with the method for another kind,
+/// throws <see cref="ArgumentException"/>: that is a mistake in the plugin, and saying so
+/// at once is kinder than a default that hides it.
+/// </remarks>
+public interface IPluginSettings
+{
+    /// <summary>A <c>text</c> setting: what the user typed, or the manifest's default.</summary>
+    string GetText(string key);
+
+    /// <summary>A <c>choice</c> setting: one of the values the manifest lists.</summary>
+    string GetChoice(string key);
+
+    /// <summary>A <c>toggle</c> setting.</summary>
+    bool GetToggle(string key);
+
+    /// <summary>
+    /// A <c>secret</c> setting (a token, a password), or null when the user has not set one.
+    /// The host keeps it encrypted for the Windows account and never shows it again once
+    /// entered. Do not log it.
+    /// </summary>
+    string? GetSecret(string key);
+}
+
+/// <summary>Read access to what the user picks from this provider.</summary>
+public interface IPluginHistory
+{
+    /// <summary>
+    /// The ids of this provider's results the user picks most, most first, weighed by how
+    /// often and how recently: what to offer when the provider's keyword is typed with nothing
+    /// after it. Rebuild each with <see cref="IRecall.RecallAsync"/>'s own logic.
+    /// </summary>
+    IReadOnlyList<string> MostPicked(int count);
 }

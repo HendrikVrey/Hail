@@ -1,0 +1,155 @@
+<ui:FluentWindow
+  x:Class="Hail.App.PluginConsentWindow"
+  x:ClassModifier="internal"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+  Title="Hail: a plugin"
+  Width="540"
+  SizeToContent="Height"
+  ResizeMode="NoResize"
+  ExtendsContentIntoTitleBar="True"
+  WindowBackdropType="Mica"
+  WindowCornerPreference="Round"
+  WindowStartupLocation="CenterScreen"
+  FontFamily="{StaticResource BoxFont}"
+  PreviewKeyDown="Window_PreviewKeyDown">
+
+  <!--
+    The question Hail asks before any of a plugin's code runs (Hail.md §9). "Keep it off" is
+    the default button, so Enter, a held key or a double press can never enable a plugin; only
+    a deliberate choice of Enable does. Escape and the close button leave without an answer.
+  -->
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <ui:TitleBar Title="Hail" ShowMaximize="False" ShowMinimize="False" />
+
+    <StackPanel Grid.Row="1" Margin="28,4,28,24">
+      <TextBlock
+        x:Name="Heading"
+        FontFamily="{StaticResource BoxDisplayFont}"
+        FontSize="20"
+        FontWeight="SemiBold"
+        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+        TextWrapping="Wrap" />
+
+      <StackPanel Margin="0,18,0,0" Orientation="Horizontal">
+        <TextBlock
+          x:Name="PluginName"
+          FontSize="16"
+          FontWeight="SemiBold"
+          Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+        <TextBlock
+          x:Name="PluginVersion"
+          Margin="8,0,0,0"
+          VerticalAlignment="Bottom"
+          FontSize="13"
+          Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+      </StackPanel>
+
+      <TextBlock
+        x:Name="Publisher"
+        Margin="0,2,0,0"
+        FontSize="13"
+        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+        TextWrapping="Wrap" />
+
+      <TextBlock
+        x:Name="Description"
+        Margin="0,10,0,0"
+        FontSize="14"
+        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+        TextWrapping="Wrap" />
+
+      <Grid Margin="0,16,0,0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.Resources>
+          <Style x:Key="FactLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Margin" Value="0,0,16,6" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+          </Style>
+          <Style x:Key="FactValue" TargetType="TextBox">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="Template">
+              <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                  <ScrollViewer x:Name="PART_ContentHost" Focusable="False" Style="{x:Null}" />
+                </ControlTemplate>
+              </Setter.Value>
+            </Setter>
+          </Style>
+        </Grid.Resources>
+
+        <TextBlock Grid.Row="0" Style="{StaticResource FactLabel}" Text="Answers" />
+        <TextBox x:Name="Answers" Grid.Row="0" Grid.Column="1" Style="{StaticResource FactValue}" />
+        <TextBlock Grid.Row="1" Style="{StaticResource FactLabel}" Text="Folder" />
+        <TextBox x:Name="Folder" Grid.Row="1" Grid.Column="1" Style="{StaticResource FactValue}" />
+        <TextBlock Grid.Row="2" Style="{StaticResource FactLabel}" Text="Fingerprint" />
+        <TextBox x:Name="Fingerprint" Grid.Row="2" Grid.Column="1" Style="{StaticResource FactValue}" FontFamily="Cascadia Mono, Consolas" />
+      </Grid>
+
+      <Border
+        Margin="0,14,0,0"
+        Padding="14,12"
+        Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
+        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+        BorderThickness="1"
+        CornerRadius="6">
+        <DockPanel>
+          <TextBlock
+            Margin="0,1,12,0"
+            DockPanel.Dock="Left"
+            FontFamily="{StaticResource IconFont}"
+            FontSize="16"
+            Foreground="{DynamicResource SystemFillColorCautionBrush}"
+            Text="&#xE7BA;" />
+          <TextBlock
+            FontSize="13"
+            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+            TextWrapping="Wrap">
+            A plugin is a program. It runs as you, and can read your files, use what you are
+            signed in to and reach the network. Enable it only if you trust where it came
+            from. If its files change, Hail turns it off and asks again.
+          </TextBlock>
+        </DockPanel>
+      </Border>
+
+      <StackPanel Margin="0,22,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+        <ui:Button
+          x:Name="EnableButton"
+          MinWidth="104"
+          Click="Enable_Click"
+          Content="Enable" />
+        <ui:Button
+          x:Name="KeepOffButton"
+          MinWidth="104"
+          Margin="8,0,0,0"
+          Appearance="Primary"
+          Click="KeepOff_Click"
+          Content="Keep it off"
+          IsDefault="True" />
+      </StackPanel>
+    </StackPanel>
+  </Grid>
+</ui:FluentWindow>

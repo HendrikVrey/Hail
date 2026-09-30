@@ -77,6 +77,16 @@ public sealed class CommandsProviderTests
     }
 
     [Fact]
+    public async Task Reload_plugins_asks_the_host_and_the_plugins_folder_opens()
+    {
+        await Run((await OneAsync("reload plugins")).Primary);
+        Assert.Equal(1, _host.Reloads);
+
+        await Run((await OneAsync("plugins folder")).Primary);
+        Assert.Equal([$"open {_host.PluginsFolder}"], _launcher.Calls);
+    }
+
+    [Fact]
     public async Task One_letter_is_not_enough()
     {
         Assert.Empty(await CollectAsync(await StartedAsync(), Query.Global("s")));
@@ -116,8 +126,14 @@ public sealed class CommandsProviderTests
     {
         public int Quits { get; private set; }
 
+        public int Reloads { get; private set; }
+
         public string SettingsPath => @"C:\Users\Test\AppData\Local\Hail\settings.json";
 
+        public string PluginsFolder => @"C:\Users\Test\AppData\Local\Hail\plugins";
+
         public void Quit() => Quits++;
+
+        public void ReloadPlugins() => Reloads++;
     }
 }

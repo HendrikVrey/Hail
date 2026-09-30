@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/plugins/">
+    <Project Path="plugins/Hail.Plugin.Everything/Hail.Plugin.Everything.csproj" />
+  </Folder>
   <Folder Name="/solution items/">
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />
@@ -8,6 +11,7 @@
   <Folder Name="/src/">
     <Project Path="src/Hail.Sdk/Hail.Sdk.csproj" />
     <Project Path="src/Hail.Core/Hail.Core.csproj" />
+    <Project Path="src/Hail.Plugins/Hail.Plugins.csproj" />
     <Project Path="src/Hail.Providers/Hail.Providers.csproj" />
     <Project Path="src/Hail.Windows/Hail.Windows.csproj" />
     <Project Path="src/Hail.Persistence/Hail.Persistence.csproj" />
@@ -15,9 +19,17 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Hail.Core.Tests/Hail.Core.Tests.csproj" />
+    <Project Path="tests/Hail.Plugin.Everything.Tests/Hail.Plugin.Everything.Tests.csproj" />
+    <Project Path="tests/Hail.Plugins.Tests/Hail.Plugins.Tests.csproj" />
     <Project Path="tests/Hail.Providers.Tests/Hail.Providers.Tests.csproj" />
     <Project Path="tests/Hail.Windows.Tests/Hail.Windows.Tests.csproj" />
     <Project Path="tests/Hail.Persistence.Tests/Hail.Persistence.Tests.csproj" />
     <Project Path="tests/Hail.App.Tests/Hail.App.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/plugins/">
+    <Project Path="tests/plugins/Hail.TestPlugin.Alpha/Hail.TestPlugin.Alpha.csproj" />
+    <Project Path="tests/plugins/Hail.TestPlugin.Beta/Hail.TestPlugin.Beta.csproj" />
+    <Project Path="tests/plugins/Hail.TestShared.V1/Hail.TestShared.V1.csproj" />
+    <Project Path="tests/plugins/Hail.TestShared.V2/Hail.TestShared.V2.csproj" />
   </Folder>
 </Solution>

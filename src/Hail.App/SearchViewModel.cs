@@ -25,6 +25,11 @@ namespace Hail.App;
 /// Results that arrive later join by the no-jump rule (<see cref="ResultList.Merge"/>), and a
 /// last-resort row (the web search) waits until every provider has answered.
 /// </para>
+/// <para>
+/// When the providers are replaced (Reload plugins), <see cref="ProvidersReplaced"/> drops every
+/// row, question and query of the old set: a plugin cannot be unloaded while the box still
+/// holds one of its results.
+/// </para>
 /// </remarks>
 internal sealed class SearchViewModel : INotifyPropertyChanged
 {
@@ -47,13 +52,13 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
     private static readonly TimeSpan ConfirmArming = TimeSpan.FromMilliseconds(400);
 
     private readonly Supervisor _supervisor;
-    private readonly QueryParser _parser;
     private readonly UsageHistory _history;
     private readonly IconCache _icons;
     private readonly IHostLog _log;
     private readonly TimeProvider _time;
-    private readonly HashSet<string> _remembered;
     private readonly ResultList _list = new();
+
+    private QueryParser _parser;
 
     private Dictionary<ProviderResult, ResultRow> _rowsByResult = new(ReferenceEqualityComparer.Instance);
     private CancellationTokenSource? _query;
@@ -66,16 +71,15 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
     private IReadOnlyList<ActionHint> _footer = [];
     private bool _executing;
 
-    public SearchViewModel(Supervisor supervisor, QueryParser parser, UsageHistory history, IconCache icons, IHostLog log, TimeProvider? time = null)
+    public SearchViewModel(Supervisor supervisor, UsageHistory history, IconCache icons, IHostLog log, TimeProvider? time = null)
     {
         _supervisor = supervisor;
-        _parser = parser;
+        _parser = new QueryParser(supervisor.Providers);
         _history = history;
         _icons = icons;
         _log = log;
         _time = time ?? TimeProvider.System;
-        _remembered = [.. supervisor.Providers.Where(p => p.IsRemembered).Select(p => p.Id)];
-        _current = parser.Parse(string.Empty);
+        _current = _parser.Parse(string.Empty);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -272,6 +276,20 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
         return true;
     }
 
+    /// <summary>
+    /// The supervisor's providers were replaced: keywords are read afresh, and every row,
+    /// question and running query of the old set is let go, so nothing here keeps an unloaded
+    /// plugin's code alive.
+    /// </summary>
+    public void ProvidersReplaced()
+    {
+        _parser = new QueryParser(_supervisor.Providers);
+        _rowsByResult = new Dictionary<ProviderResult, ResultRow>(ReferenceEqualityComparer.Instance);
+        _confirmation = null;
+        Raise(nameof(IsConfirming));
+        Reset();
+    }
+
     /// <summary>Forgets the query and its rows, for the next time the box is summoned.</summary>
     public void Reset()
     {
@@ -370,9 +388,13 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
     }
 
     private double Lift(ProviderResult result, DateTimeOffset now) =>
-        _remembered.Contains(result.ProviderId)
+        IsRemembered(result.ProviderId)
             ? _history.Lift(_current.RawText, new UsageKey(result.ProviderId, result.Result.Id), now)
             : 0;
+
+    /// <summary>Asked each time rather than once: a plugin says whether it recalls only once it has loaded.</summary>
+    private bool IsRemembered(string providerId) =>
+        _supervisor.Providers.Any(p => p.IsRemembered && string.Equals(p.Id, providerId, StringComparison.Ordinal));
 
     private async Task<ActionOutcome?> RunAsync(ProviderResult source, ResultAction action)
     {
@@ -463,7 +485,7 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
 
     private void Remember(ProviderResult source, string typed)
     {
-        if (_remembered.Contains(source.ProviderId))
+        if (IsRemembered(source.ProviderId))
         {
             _history.Record(typed, new UsageKey(source.ProviderId, source.Result.Id), _time.GetUtcNow());
         }

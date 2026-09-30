@@ -172,13 +172,17 @@ public sealed class UsageHistory
         }
     }
 
-    /// <summary>The results picked most, most recently, whatever was typed: what an empty box shows.</summary>
-    public IReadOnlyList<UsageKey> Top(int limit, DateTimeOffset now)
+    /// <summary>
+    /// The results picked most, most recently, whatever was typed: what an empty box shows.
+    /// With <paramref name="providerId"/>, that provider's only.
+    /// </summary>
+    public IReadOnlyList<UsageKey> Top(int limit, DateTimeOffset now, string? providerId = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(limit);
         lock (_gate)
         {
             return [.. _entries
+                .Where(e => providerId is null || string.Equals(e.Key.ProviderId, providerId, StringComparison.Ordinal))
                 .Select(e => (e.Key, Weight: e.Value.Sum(u => Decay(now - u.At))))
                 .OrderByDescending(e => e.Weight)
                 .ThenBy(e => e.Key.ProviderId, StringComparer.Ordinal)

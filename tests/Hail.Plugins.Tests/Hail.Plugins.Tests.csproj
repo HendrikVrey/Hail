@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Plugin loading against real plugins built with the solution (Hail.md §13): the test
+    plugins under tests/plugins and the Everything plugin, each copied into a temporary
+    plugins folder and loaded, queried and unloaded by the real loader. The references below
+    only order the build; nothing of theirs is referenced by this assembly, which is the point.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Hail.Plugins.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Hail.Plugins\Hail.Plugins.csproj" />
+    <ProjectReference Include="..\plugins\Hail.TestPlugin.Alpha\Hail.TestPlugin.Alpha.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\plugins\Hail.TestPlugin.Beta\Hail.TestPlugin.Beta.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\plugins\Hail.Plugin.Everything\Hail.Plugin.Everything.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

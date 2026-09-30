@@ -47,6 +47,7 @@
     <ProjectReference Include="..\Hail.Providers\Hail.Providers.csproj" />
     <ProjectReference Include="..\Hail.Windows\Hail.Windows.csproj" />
     <ProjectReference Include="..\Hail.Persistence\Hail.Persistence.csproj" />
+    <ProjectReference Include="..\Hail.Plugins\Hail.Plugins.csproj" />
   </ItemGroup>
 
 </Project>

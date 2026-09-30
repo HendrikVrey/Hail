@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    One of two libraries with the same assembly name and different versions, each used by one
+    test plugin: loaded side by side, each plugin must see its own (Hail.md §6.3, §13).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Hail.TestShared</AssemblyName>
+    <RootNamespace>Hail.TestShared</RootNamespace>
+    <Version>1.0.0</Version>
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+</Project>

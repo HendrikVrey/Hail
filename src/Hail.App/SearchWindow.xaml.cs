@@ -116,6 +116,15 @@ internal sealed partial class SearchWindow : Window
         _model.Reset();
     }
 
+    /// <summary>Searches the box's text again, if the box is showing: the providers have changed under it.</summary>
+    public void Refresh()
+    {
+        if (IsVisible)
+        {
+            _ = SearchAsync(SearchBox.Text);
+        }
+    }
+
     /// <summary>Lets the window close for real; Hail is quitting.</summary>
     public void CloseForQuit()
     {

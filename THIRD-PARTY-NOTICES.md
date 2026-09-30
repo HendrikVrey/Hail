@@ -48,4 +48,6 @@ SOFTWARE.
 - Licence: MIT, Copyright (c) .NET Foundation and Contributors
 
 The full text is the same MIT licence reproduced above, and is distributed with
-the .NET runtime files.
+the .NET runtime files. The `System.Data.OleDb` and
+`System.Security.Cryptography.ProtectedData` packages come from the same
+repository under the same licence.

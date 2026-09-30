@@ -14,11 +14,29 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Hail.Sdk</RootNamespace>
-    <PackageId>Hail.Sdk</PackageId>
-    <Description>The plugin contract for Hail, a keyboard launcher for Windows.</Description>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <!-- 0.x until M2: the contract is still allowed to change shape. -->
-    <Version>0.2.0</Version>
+    <!--
+      1.0 from M2: the contract is now kept. A minor version only adds; the host loads a
+      plugin built against its own major and any minor up to its own, and refuses the rest
+      with a sentence (SdkCompatibility).
+    -->
+    <Version>1.0.0</Version>
+    <!-- The XML documentation ships in the package, so a plugin author reads it in the editor. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
+
+  <PropertyGroup Label="Package">
+    <IsPackable>true</IsPackable>
+    <PackageId>Hail.Sdk</PackageId>
+    <Description>The plugin contract for Hail, a keyboard launcher for Windows. Reference it with ExcludeAssets="runtime": Hail supplies it when it loads a plugin.</Description>
+    <PackageTags>hail;launcher;plugin;windows</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
 </Project>

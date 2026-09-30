@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Hendrik Vrey",
+  "classifications": [ "Hail", "Plugin", "Library" ],
+  "identity": "Hail.Plugin.Template",
+  "name": "Hail plugin",
+  "description": "A plugin for Hail, the keyboard launcher: one provider, its plugin.json, and a build that can copy it into Hail's plugins folder.",
+  "shortName": "hail-plugin",
+  "sourceName": "HailPlugin1",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "symbols": {
+    "pluginId": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "The plugin's id: lower-case words joined by dots, such as yourname.myplugin. Its folder under Hail's plugins folder is named after it.",
+      "defaultValue": "yourname.myplugin",
+      "replaces": "yourname.myplugin"
+    },
+    "publisher": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "Who you are, as Hail shows it when it asks whether to enable the plugin.",
+      "defaultValue": "Your Name",
+      "replaces": "Your Name"
+    },
+    "keyword": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "The word that, typed first in Hail's box, sends a search to this plugin alone.",
+      "defaultValue": "hello",
+      "replaces": "hello-keyword"
+    },
+    "sdkVersion": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "The Hail.Sdk package version to build against.",
+      "defaultValue": "1.0.0",
+      "replaces": "0.0.0-sdk-version"
+    }
+  }
+}

@@ -34,9 +34,14 @@ public abstract record IconSource
         return new Glyph(glyph);
     }
 
+    /// <summary>No icon: <see cref="None"/>.</summary>
     public sealed record NoIcon : IconSource;
 
+    /// <summary>The shell's icon for an item: <see cref="ForShellItem"/>.</summary>
+    /// <param name="ParsingName">A file path or a shell parsing name.</param>
     public sealed record ShellItem(string ParsingName) : IconSource;
 
+    /// <summary>A character of the system's icon font: <see cref="ForGlyph"/>.</summary>
+    /// <param name="Character">The character that draws the glyph.</param>
     public sealed record Glyph(string Character) : IconSource;
 }

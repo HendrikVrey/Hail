@@ -3,6 +3,7 @@ namespace Hail.Sdk;
 /// <summary>A run of characters in a title.</summary>
 public readonly record struct TextSpan
 {
+    /// <summary>A run of <paramref name="length"/> characters from <paramref name="start"/>.</summary>
     public TextSpan(int start, int length)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(start);
@@ -11,10 +12,13 @@ public readonly record struct TextSpan
         Length = length;
     }
 
+    /// <summary>The first character's position.</summary>
     public int Start { get; }
 
+    /// <summary>How many characters; at least one.</summary>
     public int Length { get; }
 
+    /// <summary>The position just after the last character.</summary>
     public int End => Start + Length;
 }
 
@@ -27,8 +31,10 @@ public sealed class MatchSpans
 {
     private MatchSpans(IReadOnlyList<TextSpan> spans) => Spans = spans;
 
+    /// <summary>Nothing matched.</summary>
     public static MatchSpans Empty { get; } = new([]);
 
+    /// <summary>The runs, in order, none touching another.</summary>
     public IReadOnlyList<TextSpan> Spans { get; }
 
     /// <summary>Merges character positions into runs: 0, 1, 2, 5 becomes [0, 3) and [5, 6).</summary>

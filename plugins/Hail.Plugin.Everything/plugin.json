@@ -1,0 +1,31 @@
+{
+  "id": "vrey.everything",
+  "name": "Everything",
+  "publisher": "Hendrik Vrey",
+  "version": "1.0.0",
+  "sdk": "1.0",
+  "entry": "Hail.Plugin.Everything.dll",
+  "type": "Hail.Plugin.Everything.EverythingProvider",
+  "description": "Every file on every drive, found by Everything from voidtools, which must be installed and running.",
+  // Only after "e ": every search would show each file twice, once from the Windows index.
+  "keywords": [ "e" ],
+  "global": false,
+  "debounceMs": 120,
+  "settings": [
+    {
+      "key": "matchPath",
+      "type": "toggle",
+      "label": "Match whole paths",
+      "description": "Find files by the folders they are in as well as by their names.",
+      "default": false
+    },
+    {
+      "key": "maxResults",
+      "type": "choice",
+      "label": "Results asked for",
+      "description": "How many files Everything is asked for; Hail ranks them and shows the best eight.",
+      "choices": [ "20", "50", "100" ],
+      "default": "50"
+    }
+  ]
+}

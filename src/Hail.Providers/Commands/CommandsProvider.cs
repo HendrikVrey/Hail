@@ -90,6 +90,19 @@ public sealed class CommandsProvider(ISessionControl session, IHostCommands host
                 await context.Launcher.OpenPathAsync(host.SettingsPath, ct).ConfigureAwait(false);
             },
             Question: null),
+        new("hail.plugins", "Open plugins folder", "Where Hail's plugins are installed, one folder each", "\uE838", ["plugins folder", "hail plugins"],
+            async ct =>
+            {
+                await context.Launcher.OpenPathAsync(host.PluginsFolder, ct).ConfigureAwait(false);
+            },
+            Question: null),
+        new("hail.reload", "Reload plugins", "Read the plugins folder again and start its plugins afresh", "\uE72C", ["refresh plugins"],
+            _ =>
+            {
+                host.ReloadPlugins();
+                return ValueTask.CompletedTask;
+            },
+            Question: null),
         new("hail.quit", "Quit Hail", "Close Hail until it is started again", "\uE711", ["exit hail", "close hail"],
             _ =>
             {

@@ -59,11 +59,22 @@ public interface IActionContext
 /// <summary>The chords an action can be bound to.</summary>
 public enum Gesture
 {
+    /// <summary>Enter, or a click: the primary action.</summary>
     Enter,
+
+    /// <summary>Ctrl+Enter.</summary>
     CtrlEnter,
+
+    /// <summary>Shift+Enter.</summary>
     ShiftEnter,
+
+    /// <summary>Ctrl+Shift+Enter; by convention, as administrator.</summary>
     CtrlShiftEnter,
+
+    /// <summary>Ctrl+C with nothing selected in the box; by convention, copy the path or text.</summary>
     CtrlC,
+
+    /// <summary>Ctrl+Shift+C; by convention, copy the file itself.</summary>
     CtrlShiftC,
 }
 
@@ -99,11 +110,18 @@ public abstract record ActionOutcome
         return new Confirm(question, confirmed);
     }
 
+    /// <summary>The box goes away: <see cref="Hide"/>.</summary>
     public sealed record HideBox : ActionOutcome;
 
+    /// <summary>The box stays: <see cref="KeepOpen"/>.</summary>
     public sealed record KeepBoxOpen : ActionOutcome;
 
+    /// <summary>The box's text changes: <see cref="ReplaceQuery"/>.</summary>
+    /// <param name="Text">The new text.</param>
     public sealed record ReplaceQueryText(string Text) : ActionOutcome;
 
+    /// <summary>The box asks first: <see cref="AskFirst"/>.</summary>
+    /// <param name="Question">What the box asks.</param>
+    /// <param name="Confirmed">What runs if the user says yes.</param>
     public sealed record Confirm(string Question, ResultAction Confirmed) : ActionOutcome;
 }

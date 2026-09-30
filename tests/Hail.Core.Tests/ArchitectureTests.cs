@@ -15,7 +15,7 @@ public sealed partial class ArchitectureTests
 {
     private static readonly string RepoRoot = FindRepoRoot();
 
-    private static readonly string[] NonInteropProjects = ["Hail.Sdk", "Hail.Core", "Hail.Providers", "Hail.Persistence", "Hail.App"];
+    private static readonly string[] NonInteropProjects = ["Hail.Sdk", "Hail.Core", "Hail.Providers", "Hail.Persistence", "Hail.Plugins", "Hail.App"];
 
     [Fact]
     public void The_sdk_depends_on_nothing()
@@ -154,7 +154,57 @@ public sealed partial class ArchitectureTests
         Assert.True(offenders.Length == 0, $"Only {startup} writes to the registry. Offending files: {string.Join("; ", offenders)}");
     }
 
+    [Fact]
+    public void Only_the_plugin_host_loads_code()
+    {
+        var host = Path.Combine("src", "Hail.Plugins");
+        var offenders = SourceFiles(Path.Combine(RepoRoot, "src"))
+            .Where(f => !Path.GetRelativePath(RepoRoot, f).StartsWith(host + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            .Where(f => LoadsCode().IsMatch(CodeOnly(File.ReadAllText(f))))
+            .Select(f => Path.GetRelativePath(RepoRoot, f))
+            .ToArray();
+
+        Assert.True(
+            offenders.Length == 0,
+            $"Only {host} may load an assembly (Hail.md §6.3), so every plugin goes through its checks. Offending files: {string.Join("; ", offenders)}");
+    }
+
+    [Fact]
+    public void The_plugin_host_starts_no_process_and_touches_no_registry()
+    {
+        AssertNoMatch(
+            "Hail.Plugins",
+            new Regex(@"\bProcess\b|\bRegistry(Key)?\b"),
+            "Hail.Plugins loads and unloads; launching belongs to the launcher, whatever a plugin asks.");
+    }
+
+    [Fact]
+    public void The_everything_plugin_references_the_sdk_and_nothing_else_of_hails()
+    {
+        var project = XDocument.Load(Path.Combine(RepoRoot, "plugins", "Hail.Plugin.Everything", "Hail.Plugin.Everything.csproj"));
+        var references = project.Descendants("ProjectReference").Select(e => e.Attribute("Include")!.Value).ToArray();
+
+        // Hail.md §11: if the SDK is not enough to write it, the SDK is wrong.
+        var sdk = Assert.Single(references);
+        Assert.EndsWith(@"src\Hail.Sdk\Hail.Sdk.csproj", sdk, StringComparison.Ordinal);
+        Assert.Empty(project.Descendants("PackageReference"));
+        Assert.Equal("false", project.Descendants("ProjectReference").Single().Attribute("Private")?.Value);
+    }
+
+    [Fact]
+    public void The_sdk_is_packable_with_its_readme_and_nothing_else_is()
+    {
+        var sdk = File.ReadAllText(ProjectFile("Hail.Sdk"));
+        Assert.Contains("<IsPackable>true</IsPackable>", sdk, StringComparison.Ordinal);
+        Assert.Contains("<PackageReadmeFile>README.md</PackageReadmeFile>", sdk, StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(RepoRoot, "src", "Hail.Sdk", "README.md")));
+        Assert.Contains("<IsPackable>false</IsPackable>", File.ReadAllText(Path.Combine(RepoRoot, "Directory.Build.props")), StringComparison.Ordinal);
+    }
+
     public static TheoryData<string> NonInterop() => new(NonInteropProjects);
+
+    [GeneratedRegex(@"\bAssemblyLoadContext\b|\bAssembly\.(Load|LoadFrom|LoadFile|UnsafeLoadFrom)\b|\bLoadFromAssemblyPath\b|\bLoadFromStream\b|\bActivator\.CreateInstance\b")]
+    private static partial Regex LoadsCode();
 
     [GeneratedRegex(@"\bOleDb\w*\b")]
     private static partial Regex OleDb();

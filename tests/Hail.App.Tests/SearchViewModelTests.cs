@@ -231,6 +231,32 @@ public sealed class SearchViewModelTests
         });
     }
 
+    [Fact]
+    public void Replacing_the_providers_lets_go_of_the_old_sets_rows_and_question_and_reads_the_new_keywords()
+    {
+        Ui.Run(async () =>
+        {
+            var confirmed = new ResultAction("Restart", Gesture.Enter, (_, _) => Ran("restart"));
+            var restart = Row("Restart", run: () => ValueTask.FromResult(ActionOutcome.AskFirst("Restart?", confirmed)));
+            using var box = new Box([Register("old", Rows(_ => [restart]))]);
+            await box.Model.SearchAsync("re");
+            await box.Model.ExecuteAsync(Gesture.Enter);
+            Assert.True(box.Model.IsConfirming);
+
+            // Reload plugins: a plugin's rows and questions must not outlive its set, or it cannot be unloaded.
+            box.Supervisor.Replace([box.Registration("new", Rows(q => [Row($"new {q.Search}")]), keyword: "k")]);
+            box.Model.ProvidersReplaced();
+
+            Assert.False(box.Model.IsConfirming);
+            Assert.Empty(box.Model.Rows);
+
+            await box.Model.SearchAsync("k cats");
+            Assert.Equal("new", box.Model.Scope);
+            Assert.Equal(["new cats"], box.Model.Rows.Select(r => r.Title));
+            Assert.Empty(_ran);
+        });
+    }
+
     private ValueTask<ActionOutcome> Ran(string what)
     {
         lock (_ran)
@@ -275,21 +301,25 @@ public sealed class SearchViewModelTests
             TimeProvider? time = null,
             TimeSpan? actionBudget = null)
         {
-            var registrations = providers
-                .Select(p => new ProviderRegistration(p.Id, p.Id, p.Provider, new PluginContext(p.Id, new NullLauncher(), new FuzzyMatcher(), new NullClipboard(), Log))
-                {
-                    Debounce = p.Debounce,
-                })
-                .ToArray();
+            var registrations = providers.Select(p => Registration(p.Id, p.Provider, p.Debounce)).ToArray();
 
-            var supervisor = new Supervisor(registrations, Log, new SupervisorOptions { FirstFrameBudget = TimeSpan.FromMilliseconds(100) });
-            Model = new SearchViewModel(supervisor, new QueryParser(registrations), history ?? new UsageHistory(), new IconCache(new ShellIcons(_worker)), Log, time)
+            Supervisor = new Supervisor(registrations, Log, new SupervisorOptions { FirstFrameBudget = TimeSpan.FromMilliseconds(100) });
+            Model = new SearchViewModel(Supervisor, history ?? new UsageHistory(), new IconCache(new ShellIcons(_worker)), Log, time)
             {
                 ActionBudget = actionBudget ?? TimeSpan.FromSeconds(20),
             };
         }
 
         public RecordingLog Log { get; } = new();
+
+        public Supervisor Supervisor { get; }
+
+        public ProviderRegistration Registration(string id, IProvider provider, TimeSpan debounce = default, string? keyword = null) =>
+            new(id, id, provider, new PluginContext(id, new NullLauncher(), new FuzzyMatcher(), new NullClipboard(), Log))
+            {
+                Debounce = debounce,
+                Keywords = keyword is null ? [] : [new ProviderKeyword(keyword, id)],
+            };
 
         public SearchViewModel Model { get; }
 

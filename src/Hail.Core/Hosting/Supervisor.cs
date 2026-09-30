@@ -44,23 +44,32 @@ public sealed record RecallOutcome(IReadOnlyList<ProviderResult> Found, IReadOnl
 /// Runs a query across its providers (Hail.md §6.4, §6.5). Each provider runs on its own task,
 /// after its own debounce, initialised lazily and once, cut off at the hard budget; a provider
 /// that throws or overruns costs itself and, after <see cref="SupervisorOptions.FaultLimit"/>
-/// faults in a minute, is switched off until Hail restarts.
+/// faults in a minute, is switched off until the set is replaced (Reload plugins) or Hail restarts.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Results arrive a provider at a time. The first update waits, at most for the first-frame
 /// budget, for every provider without a debounce, so that the ones answering from memory are
 /// ranked against each other; every later update adds a provider that took longer.
+/// </para>
+/// <para>
+/// The set of providers can be replaced whole (Reload plugins, Hail.md §6.3). A provider that
+/// is in both sets keeps its initialisation, so a built-in is initialised once for the life of
+/// the process as the SDK promises; every provider starts with a clean fault record. Work still
+/// running for a provider that is no longer in the set (a plugin being unloaded under a query)
+/// records no fault: the new copy under the same id must not pay for the old one's end.
+/// </para>
 /// </remarks>
 public sealed class Supervisor
 {
-    private readonly IReadOnlyList<ProviderRegistration> _providers;
     private readonly IHostLog _log;
     private readonly SupervisorOptions _options;
     private readonly TimeProvider _time;
-    private readonly Dictionary<string, Task<bool>> _initialisations = new(StringComparer.Ordinal);
+    private readonly Dictionary<IProvider, Task<bool>> _initialisations = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<string, Queue<DateTimeOffset>> _faultTimes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ProviderFault> _disabled = new(StringComparer.Ordinal);
     private readonly Lock _gate = new();
+    private IReadOnlyList<ProviderRegistration> _providers;
 
     public Supervisor(IReadOnlyList<ProviderRegistration> providers, IHostLog log, SupervisorOptions? options = null, TimeProvider? time = null)
     {
@@ -75,7 +84,17 @@ public sealed class Supervisor
     /// <summary>Raised, on whichever thread noticed, when a provider is switched off.</summary>
     public event Action? FaultsChanged;
 
-    public IReadOnlyList<ProviderRegistration> Providers => _providers;
+    /// <summary>The providers in force, in the user's order.</summary>
+    public IReadOnlyList<ProviderRegistration> Providers
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _providers;
+            }
+        }
+    }
 
     /// <summary>The providers switched off so far, in the order they were.</summary>
     public IReadOnlyList<ProviderFault> Faults
@@ -95,6 +114,31 @@ public sealed class Supervisor
         {
             return _disabled.ContainsKey(providerId);
         }
+    }
+
+    /// <summary>
+    /// Puts <paramref name="providers"/> in force in place of the current set. A query already
+    /// running finishes against the set it started with. Every provider's faults are forgotten:
+    /// a reload is a fresh chance (Hail.md §6.5).
+    /// </summary>
+    public void Replace(IReadOnlyList<ProviderRegistration> providers)
+    {
+        ArgumentNullException.ThrowIfNull(providers);
+        lock (_gate)
+        {
+            _providers = providers;
+
+            var present = providers.Select(p => p.Provider).ToHashSet(ReferenceEqualityComparer.Instance);
+            foreach (var gone in _initialisations.Keys.Where(p => !present.Contains(p)).ToArray())
+            {
+                _initialisations.Remove(gone);
+            }
+
+            _faultTimes.Clear();
+            _disabled.Clear();
+        }
+
+        FaultsChanged?.Invoke();
     }
 
     /// <summary>
@@ -184,7 +228,8 @@ public sealed class Supervisor
     {
         ArgumentNullException.ThrowIfNull(keys);
 
-        var outcomes = await Task.WhenAll(keys.Select(key => RecallOneAsync(key, ct))).ConfigureAwait(false);
+        var providers = Providers;
+        var outcomes = await Task.WhenAll(keys.Select(key => RecallOneAsync(providers, key, ct))).ConfigureAwait(false);
 
         foreach (var failed in outcomes.Where(o => o.Fault is not null).GroupBy(o => o.Registration!.Id))
         {
@@ -296,12 +341,12 @@ public sealed class Supervisor
         }
     }
 
-    private async Task<Recalled> RecallOneAsync(UsageKey key, CancellationToken ct)
+    private async Task<Recalled> RecallOneAsync(IReadOnlyList<ProviderRegistration> providers, UsageKey key, CancellationToken ct)
     {
         var order = -1;
-        for (var i = 0; i < _providers.Count; i++)
+        for (var i = 0; i < providers.Count; i++)
         {
-            if (string.Equals(_providers[i].Id, key.ProviderId, StringComparison.Ordinal))
+            if (string.Equals(providers[i].Id, key.ProviderId, StringComparison.Ordinal))
             {
                 order = i;
                 break;
@@ -309,7 +354,7 @@ public sealed class Supervisor
         }
 
         // A provider that is not here today (switched off in settings, say) keeps its history.
-        if (order < 0 || _providers[order] is not { Provider: IRecall recall } registration || IsDisabled(registration.Id))
+        if (order < 0 || providers[order] is not { Provider: IRecall recall } registration || IsDisabled(registration.Id))
         {
             return new Recalled(key);
         }
@@ -359,12 +404,12 @@ public sealed class Supervisor
         Task<bool> initialisation;
         lock (_gate)
         {
-            if (!_initialisations.TryGetValue(registration.Id, out initialisation!))
+            if (!_initialisations.TryGetValue(registration.Provider, out initialisation!))
             {
                 // Started on the pool, so a provider whose initialisation blocks before its
                 // first await does not do it under this lock.
                 initialisation = Task.Run(() => InitialiseAsync(registration), CancellationToken.None);
-                _initialisations[registration.Id] = initialisation;
+                _initialisations[registration.Provider] = initialisation;
             }
         }
 
@@ -389,7 +434,7 @@ public sealed class Supervisor
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            _log.LogError($"Provider {registration.Id} failed to start and is switched off until Hail restarts: {Redaction.Describe(ex)}");
+            _log.LogError($"Provider {registration.Id} failed to start and is switched off until plugins are reloaded or Hail restarts: {Redaction.Describe(ex)}");
             Disable(registration, "it failed to start");
             return false;
         }
@@ -400,7 +445,7 @@ public sealed class Supervisor
         var now = _time.GetUtcNow();
         lock (_gate)
         {
-            if (_disabled.ContainsKey(registration.Id))
+            if (_disabled.ContainsKey(registration.Id) || !IsCurrent(registration))
             {
                 return;
             }
@@ -424,7 +469,7 @@ public sealed class Supervisor
             }
         }
 
-        _log.LogError($"Provider {registration.Id} faulted {_options.FaultLimit} times in a minute ({reason}) and is switched off until Hail restarts.");
+        _log.LogError($"Provider {registration.Id} faulted {_options.FaultLimit} times in a minute ({reason}) and is switched off until plugins are reloaded or Hail restarts.");
         Disable(registration, $"{reason}, {_options.FaultLimit} times in a minute");
     }
 
@@ -432,7 +477,7 @@ public sealed class Supervisor
     {
         lock (_gate)
         {
-            if (!_disabled.TryAdd(registration.Id, new ProviderFault(registration.Id, registration.Name, reason)))
+            if (!IsCurrent(registration) || !_disabled.TryAdd(registration.Id, new ProviderFault(registration.Id, registration.Name, reason)))
             {
                 return;
             }
@@ -440,6 +485,10 @@ public sealed class Supervisor
 
         FaultsChanged?.Invoke();
     }
+
+    /// <summary>Whether <paramref name="registration"/>'s provider is in the set in force. Call under the gate.</summary>
+    private bool IsCurrent(ProviderRegistration registration) =>
+        _providers.Any(p => ReferenceEquals(p.Provider, registration.Provider));
 
     private static void TryCancel(CancellationTokenSource source)
     {

@@ -333,6 +333,85 @@ public sealed class SupervisorTests
         Assert.Contains(_log.Lines, l => l.Contains("apps faulted", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Replacing_the_set_keeps_each_providers_initialisation_and_forgets_every_fault()
+    {
+        var apps = ScriptedProvider.Returning(Fakes.Result("app"));
+        var plugin = new ScriptedProvider((_, _) => Throwing());
+        var supervisor = new Supervisor([Register("apps", apps), Register("plugin", plugin)], _log, Options());
+        for (var i = 0; i < 3; i++)
+        {
+            await RunAsync(supervisor, "x");
+        }
+
+        Assert.True(supervisor.IsDisabled("plugin"));
+
+        // Reload plugins: the built-in is the same object, the plugin a new one under the same id.
+        var reloaded = ScriptedProvider.Returning(Fakes.Result("plugin"));
+        supervisor.Replace([Register("apps", apps), Register("plugin", reloaded)]);
+
+        Assert.False(supervisor.IsDisabled("plugin"));
+        Assert.Empty(supervisor.Faults);
+        Assert.Equal(["app", "plugin"], Ids((await RunAsync(supervisor, "x"))[^1]));
+        Assert.Equal(1, apps.Initialisations);
+        Assert.Equal(1, reloaded.Initialisations);
+    }
+
+    [Fact]
+    public async Task A_query_started_before_a_replace_finishes_with_the_set_it_started_with()
+    {
+        var gate = new TaskCompletionSource();
+        var old = new ScriptedProvider((_, ct) => Gated(gate.Task, ct, Fakes.Result("old")));
+        var supervisor = new Supervisor([Register("p", old)], _log, Options(firstFrameMs: 10));
+
+        var running = RunAsync(supervisor, "x");
+        supervisor.Replace([Register("p", ScriptedProvider.Returning(Fakes.Result("new")))]);
+        gate.SetResult();
+
+        Assert.Equal(["old"], Ids((await running)[^1]));
+        Assert.Equal(["new"], Ids((await RunAsync(supervisor, "x"))[^1]));
+    }
+
+    [Fact]
+    public async Task A_replaced_provider_failing_afterwards_does_not_switch_off_its_successor()
+    {
+        // A plugin still starting when Reload plugins arrives, which then fails as it is unloaded.
+        var starting = new TaskCompletionSource();
+        var old = new ScriptedProvider((_, ct) => ScriptedProvider.Yield([], ct)) { OnInitialize = async () => await starting.Task };
+        var supervisor = new Supervisor([Register("plugin", old)], _log, Options(hardMs: 100));
+        await RunAsync(supervisor, "x");
+
+        var fresh = ScriptedProvider.Returning(Fakes.Result("fresh"));
+        supervisor.Replace([Register("plugin", fresh)]);
+        starting.SetException(new InvalidOperationException("unloaded under it"));
+        await Task.Delay(50, Token);
+
+        Assert.False(supervisor.IsDisabled("plugin"));
+        Assert.Equal(["fresh"], Ids((await RunAsync(supervisor, "x"))[^1]));
+    }
+
+    [Fact]
+    public void A_stand_in_is_remembered_only_once_what_it_stands_for_recalls()
+    {
+        var proxy = new StandIn();
+        var registration = Register("plugin", proxy);
+
+        Assert.False(registration.IsRemembered);
+        proxy.Recalls = true;
+        Assert.True(registration.IsRemembered);
+        Assert.True(Register("files", new RecallingProvider(_ => Recollection.Unknown)).IsRemembered);
+        Assert.False(Register("web", ScriptedProvider.Returning()).IsRemembered);
+    }
+
+    private static async IAsyncEnumerable<Result> Gated(Task gate, [EnumeratorCancellation] CancellationToken ct, params Result[] results)
+    {
+        await gate.WaitAsync(ct);
+        foreach (var result in results)
+        {
+            yield return result;
+        }
+    }
+
     private static async IAsyncEnumerable<Result> Delayed(int milliseconds, [EnumeratorCancellation] CancellationToken ct, params Result[] results)
     {
         await Task.Delay(milliseconds, ct);

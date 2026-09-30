@@ -17,6 +17,8 @@
   <ItemGroup Label="Windows">
     <!-- The Windows Search index is reached through OLE DB (Search.CollatorDSO); Hail.Windows only. -->
     <PackageVersion Include="System.Data.OleDb" Version="10.0.12" />
+    <!-- DPAPI for plugins' secrets (Hail.md §9), as Sling keeps its tokens; Hail.Windows only. -->
+    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup Label="Testing">

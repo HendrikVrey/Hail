@@ -322,6 +322,7 @@ internal static partial class Shell32
     public const uint NIF_TIP = 0x04;
     public const uint NIF_INFO = 0x10;
     public const uint NIF_SHOWTIP = 0x80;
+    public const uint NIIF_INFO = 0x01;
     public const uint NIIF_WARNING = 0x02;
     public const uint NOTIFYICON_VERSION_4 = 4;
 

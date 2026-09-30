@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The first external plugin (Hail.md §7.2, §12 M2): every file on every drive, from
+    Everything by voidtools. It is built and loaded exactly as a stranger's plugin would be,
+    and ArchitectureTests holds this file to referencing Hail.Sdk and nothing else of Hail's:
+    if it needs more, the SDK is not enough.
+
+    It talks to Everything over Everything's own documented IPC (a WM_COPYDATA query and
+    reply), so no voidtools binary is shipped; Everything must be installed and running.
+
+    Build, then copy the output folder to %LOCALAPPDATA%\Hail\plugins\vrey.everything\, or
+    build with -p:HailDeploy=true to have it copied there; then Reload plugins in the tray.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Hail.Plugin.Everything</RootNamespace>
+    <!-- A plugin: its .deps.json describes it as a component and its dependencies are copied beside it. -->
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <!-- LibraryImport with pointers to Win32 structures. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <HailPluginId>vrey.everything</HailPluginId>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Hail supplies Hail.Sdk when it loads the plugin; a copy in the folder would be ignored. -->
+    <ProjectReference Include="..\..\src\Hail.Sdk\Hail.Sdk.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Hail.Plugin.Everything.Tests" />
+  </ItemGroup>
+
+  <Target Name="DeployToHail" AfterTargets="Build" Condition="'$(HailDeploy)' == 'true'">
+    <ItemGroup>
+      <PluginFile Include="$(OutDir)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PluginFile)" DestinationFiles="@(PluginFile->'$(LOCALAPPDATA)\Hail\plugins\$(HailPluginId)\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Copied to $(LOCALAPPDATA)\Hail\plugins\$(HailPluginId). Reload plugins in Hail's tray menu." />
+  </Target>
+
+</Project>

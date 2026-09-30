@@ -127,6 +127,14 @@ internal class ScriptedProvider(Func<Query, CancellationToken, IAsyncEnumerable<
     }
 }
 
+/// <summary>A provider standing in for a plugin, which says whether it recalls only once loaded.</summary>
+internal sealed class StandIn() : ScriptedProvider((_, ct) => Yield([], ct)), IRecall, IProviderProxy
+{
+    public bool Recalls { get; set; }
+
+    public ValueTask<Recollection> RecallAsync(string id, CancellationToken ct) => ValueTask.FromResult(Recollection.Unknown);
+}
+
 /// <summary>A scripted provider that can also rebuild results by id.</summary>
 internal sealed class RecallingProvider(Func<string, ValueTask<Recollection>> recall)
     : ScriptedProvider((_, ct) => Yield([], ct)), IRecall

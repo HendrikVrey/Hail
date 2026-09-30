@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- A plugin: its .deps.json describes it as a component, and its dependencies are copied beside it. -->
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <!-- The folder under Hail's plugins folder; it must be the id in plugin.json. -->
+    <HailPluginId>yourname.myplugin</HailPluginId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Hail supplies Hail.Sdk when it loads the plugin, so it is not copied beside it. -->
+    <PackageReference Include="Hail.Sdk" Version="0.0.0-sdk-version" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!--
+    dotnet build -p:HailDeploy=true copies the plugin into Hail's plugins folder. Then choose
+    Reload plugins in Hail's tray menu (or type "reload plugins" in the box): Hail asks
+    whether to enable it, because its files are new to it.
+  -->
+  <Target Name="DeployToHail" AfterTargets="Build" Condition="'$(HailDeploy)' == 'true'">
+    <ItemGroup>
+      <PluginFile Include="$(OutDir)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PluginFile)" DestinationFiles="@(PluginFile->'$(LOCALAPPDATA)\Hail\plugins\$(HailPluginId)\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Copied to $(LOCALAPPDATA)\Hail\plugins\$(HailPluginId). Reload plugins in Hail's tray menu." />
+  </Target>
+
+</Project>

@@ -30,8 +30,21 @@ public sealed record ProviderRegistration(string Id, string Name, IProvider Prov
     /// </summary>
     public TimeSpan Debounce { get; init; } = TimeSpan.Zero;
 
-    /// <summary>Whether what this provider finds is remembered in history (it implements <see cref="IRecall"/>).</summary>
-    public bool IsRemembered => Provider is IRecall;
+    /// <summary>
+    /// Whether what this provider finds is remembered in history (it implements
+    /// <see cref="IRecall"/>). For a plugin that is known only once it has loaded.
+    /// </summary>
+    public bool IsRemembered => Provider is IProviderProxy proxy ? proxy.Recalls : Provider is IRecall;
+}
+
+/// <summary>
+/// A provider that stands in for another loaded later (a plugin), and so implements
+/// <see cref="IRecall"/> whether or not the one it stands for does.
+/// </summary>
+public interface IProviderProxy
+{
+    /// <summary>Whether the provider stood in for implements <see cref="IRecall"/>; false until it is loaded.</summary>
+    bool Recalls { get; }
 }
 
 /// <summary>A keyword and the name the box shows while it is in force (<c>g</c>, Google).</summary>

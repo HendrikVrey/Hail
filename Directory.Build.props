@@ -14,6 +14,8 @@
     -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Only Hail.Sdk is a package (Hail.md §14); it opts back in. -->
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <PropertyGroup Label="Identity">
