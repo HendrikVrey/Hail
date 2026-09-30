@@ -40,6 +40,12 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
     /// <summary>How long Enter pressed on the previous text's rows waits for the current text's.</summary>
     private static readonly TimeSpan EnterWait = TimeSpan.FromSeconds(3);
 
+    /// <summary>
+    /// A question is not answered by an Enter that arrives this soon after it appears: a
+    /// double press, or a key held down, must not restart Windows.
+    /// </summary>
+    private static readonly TimeSpan ConfirmArming = TimeSpan.FromMilliseconds(400);
+
     private readonly Supervisor _supervisor;
     private readonly QueryParser _parser;
     private readonly UsageHistory _history;
@@ -73,6 +79,13 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>
+    /// How long an action is waited for before the box stops waiting and says so. Long enough
+    /// for Windows' elevation prompt to be answered; short enough that one stuck launch (a
+    /// shell extension that never returns) does not leave Enter dead for the session.
+    /// </summary>
+    internal TimeSpan ActionBudget { get; init; } = TimeSpan.FromSeconds(20);
 
     public ObservableCollection<ResultRow> Rows { get; } = [];
 
@@ -210,7 +223,7 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
 
         if (_confirmation is { } confirmation)
         {
-            return gesture == Gesture.Enter
+            return gesture == Gesture.Enter && _time.GetElapsedTime(confirmation.ShownAt) >= ConfirmArming
                 ? await RunAsync(confirmation.Source, confirmation.Question.Confirmed).ConfigureAwait(true)
                 : null;
         }
@@ -228,7 +241,8 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
                 ready = false;
             }
 
-            if (!ready || !ReferenceEquals(query, _query) || _confirmation is not null)
+            // A second Enter that waited alongside the first finds it already running.
+            if (!ready || !ReferenceEquals(query, _query) || _confirmation is not null || _executing)
             {
                 return null;
             }
@@ -363,19 +377,39 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
     private async Task<ActionOutcome?> RunAsync(ProviderResult source, ResultAction action)
     {
         _executing = true;
+
+        // Taken now: the app being started can take the foreground before the action returns,
+        // which hides and resets the box, and the pick must be remembered for what was typed.
+        var typed = _current.RawText;
+        var context = new ActionContext(QueryFor(source));
+
+        // The action is a provider's code: it runs off the UI thread, and is waited for no
+        // longer than the budget.
+        var limit = new CancellationTokenSource(ActionBudget, _time);
+        var running = Task.Run(() => action.Execute(context, limit.Token).AsTask(), CancellationToken.None);
+        _ = running.ContinueWith(
+            done =>
+            {
+                _ = done.Exception;
+                limit.Dispose();
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
         try
         {
-            var outcome = await action.Execute(new ActionContext(QueryFor(source)), CancellationToken.None).ConfigureAwait(true);
+            var outcome = await running.WaitAsync(ActionBudget, _time).ConfigureAwait(true);
             if (outcome is ActionOutcome.Confirm confirm)
             {
-                _confirmation = new Confirmation(confirm, source);
+                _confirmation = new Confirmation(confirm, source, _time.GetTimestamp());
                 Raise(nameof(IsConfirming));
                 Status = null;
                 Render();
                 return ActionOutcome.KeepOpen;
             }
 
-            Remember(source);
+            Remember(source, typed);
             if (_confirmation is not null)
             {
                 _confirmation = null;
@@ -385,16 +419,22 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
 
             return outcome;
         }
+        catch (Exception ex) when (ex is TimeoutException || (ex is OperationCanceledException && limit.IsCancellationRequested))
+        {
+            _log.LogError($"\"{action.Title}\" for a result of {source.ProviderId} did not finish within {ActionBudget.TotalSeconds:0} s; Hail stopped waiting.");
+            return Failed($"“{action.Title}” is taking too long; Hail stopped waiting for it.");
+        }
         catch (LaunchRefusedException refused)
         {
-            _log.LogError($"Refused \"{action.Title}\" for a result of {source.ProviderId}.", refused);
+            _log.LogError($"Refused \"{action.Title}\" for a result of {source.ProviderId}: {Redaction.Describe(refused)}");
             return Failed(refused.Message);
         }
 #pragma warning disable CA1031 // The action is a provider's code; its failure is reported, not fatal.
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            _log.LogError($"\"{action.Title}\" failed for a result of {source.ProviderId}.", ex);
+            // Never the message: .NET's own names the address or path it could not open.
+            _log.LogError($"\"{action.Title}\" failed for a result of {source.ProviderId}: {Redaction.Describe(ex)}");
             return Failed($"“{action.Title}” did not work for {source.Result.Title}.");
         }
         finally
@@ -421,17 +461,22 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
         _current.Targets.FirstOrDefault(t => t.Registration.Id == source.ProviderId)?.Query
         ?? Query.Global(_current.RawText);
 
-    private void Remember(ProviderResult source)
+    private void Remember(ProviderResult source, string typed)
     {
         if (_remembered.Contains(source.ProviderId))
         {
-            _history.Record(_current.RawText, new UsageKey(source.ProviderId, source.Result.Id), _time.GetUtcNow());
+            _history.Record(typed, new UsageKey(source.ProviderId, source.Result.Id), _time.GetUtcNow());
         }
     }
 
+    /// <remarks>
+    /// Ignored while the rows belong to the previous text: the current text's rows replace
+    /// them with the first one highlighted, and a move made on the old rows would be lost under
+    /// an Enter that then ran a row the user had moved away from.
+    /// </remarks>
     private void Move(Action move)
     {
-        if (_confirmation is not null)
+        if (_confirmation is not null || !_listIsCurrent)
         {
             return;
         }
@@ -524,8 +569,8 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
     private void Raise([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-    /// <summary>A question an action asked (Restart Windows?) and the row that asked it.</summary>
-    private sealed record Confirmation(ActionOutcome.Confirm Question, ProviderResult Source)
+    /// <summary>A question an action asked (Restart Windows?), the row that asked it, and when.</summary>
+    private sealed record Confirmation(ActionOutcome.Confirm Question, ProviderResult Source, long ShownAt)
     {
         public Result AsResult() =>
             new(

@@ -217,10 +217,15 @@ public sealed class UsageHistory
         Changed?.Invoke();
     }
 
+    /// <remarks>
+    /// A pick from the empty box (typed nothing) counts towards the most-picked list and lifts
+    /// nothing typed: every text starts with the empty one, and it would otherwise lift that
+    /// result for everything it matches.
+    /// </remarks>
     private static bool Related(string then, string now) =>
         now.Length == 0
-        || then.StartsWith(now, StringComparison.Ordinal)
-        || now.StartsWith(then, StringComparison.Ordinal);
+        || (then.Length > 0
+            && (then.StartsWith(now, StringComparison.Ordinal) || now.StartsWith(then, StringComparison.Ordinal)));
 
     private static double Decay(TimeSpan age) =>
         age <= TimeSpan.Zero ? 1 : Math.Pow(0.5, age / HalfLife);

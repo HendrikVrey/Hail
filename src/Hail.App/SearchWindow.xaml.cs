@@ -224,9 +224,11 @@ internal sealed partial class SearchWindow : Window
                 e.Handled = true;
                 break;
 
+            // A held Enter repeats; only the press itself acts, so holding it cannot run one
+            // row after another or answer a question the first press asked.
             case Key.Enter:
                 e.Handled = true;
-                if (EnterGesture(modifiers) is { } gesture)
+                if (!e.IsRepeat && EnterGesture(modifiers) is { } gesture)
                 {
                     _ = ExecuteAsync(gesture);
                 }

@@ -60,19 +60,23 @@ public sealed class AppsProvider(IAppCatalog catalog) : IProvider, IRecall
         await Task.CompletedTask.ConfigureAwait(false);
     }
 
-    /// <summary>
+    /// <remarks>
     /// An empty list means the Start menu has not been read yet, not that every app is gone,
-    /// so nothing is recalled, and nothing forgotten, until it has been.
-    /// </summary>
-    public bool CanRecall => catalog.Apps.Count > 0;
-
-    public ValueTask<Result?> RecallAsync(string id, CancellationToken ct)
+    /// so the answer is "cannot tell" until it has been.
+    /// </remarks>
+    public ValueTask<Recollection> RecallAsync(string id, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(id);
         var context = Context();
 
-        var app = catalog.Apps.FirstOrDefault(a => string.Equals(a.Id, id, StringComparison.OrdinalIgnoreCase));
-        return ValueTask.FromResult(app is null ? null : ToResult(app, 1.0, highlight: null, context.Launcher));
+        var apps = catalog.Apps;
+        if (apps.Count == 0)
+        {
+            return ValueTask.FromResult(Recollection.Unknown);
+        }
+
+        var app = apps.FirstOrDefault(a => string.Equals(a.Id, id, StringComparison.OrdinalIgnoreCase));
+        return ValueTask.FromResult(app is null ? Recollection.Gone : Recollection.Of(ToResult(app, 1.0, highlight: null, context.Launcher)));
     }
 
     private IPluginContext Context() =>

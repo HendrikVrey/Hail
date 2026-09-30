@@ -32,6 +32,17 @@ public sealed class UsageHistoryTests
     }
 
     [Fact]
+    public void A_pick_from_the_empty_box_counts_for_the_top_and_lifts_nothing_typed()
+    {
+        var history = new UsageHistory();
+        history.Record(string.Empty, Vlc, Now);
+
+        Assert.Equal([Vlc], history.Top(8, Now));
+        Assert.Equal(0, history.Lift("v", Vlc, Now));
+        Assert.Equal(0, history.Lift("vlc media", Vlc, Now));
+    }
+
+    [Fact]
     public void More_picks_count_more_but_never_reach_one()
     {
         var history = new UsageHistory();

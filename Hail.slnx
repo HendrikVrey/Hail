@@ -18,5 +18,6 @@
     <Project Path="tests/Hail.Providers.Tests/Hail.Providers.Tests.csproj" />
     <Project Path="tests/Hail.Windows.Tests/Hail.Windows.Tests.csproj" />
     <Project Path="tests/Hail.Persistence.Tests/Hail.Persistence.Tests.csproj" />
+    <Project Path="tests/Hail.App.Tests/Hail.App.Tests.csproj" />
   </Folder>
 </Solution>

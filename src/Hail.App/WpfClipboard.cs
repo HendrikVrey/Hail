@@ -29,7 +29,7 @@ internal sealed class WpfClipboard(Dispatcher dispatcher) : IClipboard
     public async ValueTask SetFileAsync(string path, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(path);
-        if (!LocalPaths.Exists(path))
+        if (!await Task.Run(() => LocalPaths.Exists(path), ct).ConfigureAwait(false))
         {
             throw new LaunchRefusedException("Hail only copies files that are on this PC's own drives and still there.");
         }

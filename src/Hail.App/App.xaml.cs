@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Windows;
+using Hail.Core.Hosting;
 using Hail.Persistence;
 using Hail.Windows;
 using Wpf.Ui.Appearance;
@@ -59,12 +60,13 @@ public partial class App : Application
     {
         // Hail.md §5: an unhandled exception is logged with what was being done and the
         // process exits; the next sign-in, or the Start menu shortcut, brings it back. A
-        // provider's exception never reaches here (QueryRunner contains it).
+        // provider's exception never reaches here (the Supervisor contains it).
         DispatcherUnhandledException += (_, args) => Crash(log, "UI thread", args.Exception);
         AppDomain.CurrentDomain.UnhandledException += (_, args) => Crash(log, "background thread", args.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, args) =>
         {
-            log.LogError("A background task failed and nothing was waiting for it.", args.Exception);
+            // Redacted like every provider failure: a plugin's exception message can carry what was typed.
+            log.LogError($"A background task failed and nothing was waiting for it: {Redaction.Describe(args.Exception)}");
             args.SetObserved();
         };
     }

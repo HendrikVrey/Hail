@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
+using Hail.Core.Ports;
 using Hail.Windows.Interop;
+using Hail.Windows.Launching;
 
 namespace Hail.Windows.Icons;
 
@@ -33,6 +35,14 @@ public sealed class ShellIcons(StaWorker worker)
         ArgumentException.ThrowIfNullOrWhiteSpace(parsingName);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(size, MaxSize);
+
+        // An icon source is a provider's data: resolving \\server\share\x would reach that
+        // server with the user's credentials, which the launcher's rules forbid, so the shell
+        // is only asked about the Start menu's apps and local paths.
+        if (!parsingName.StartsWith(AppsFolder.Prefix, StringComparison.OrdinalIgnoreCase) && !LocalPaths.IsAcceptable(parsingName))
+        {
+            return Task.FromResult<IconPixels?>(null);
+        }
 
         return worker.RunAsync(() => Load(parsingName, size), ct);
     }

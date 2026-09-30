@@ -17,13 +17,30 @@ internal readonly record struct CalcValue(decimal Decimal, double Double, bool I
     private const double DecimalCeiling = 7.9e28;
     private const double DecimalFloor = 1e-20;
 
+    /// <summary>Decimal holds 28 or 29 significant digits; at 28 a result may already be rounded.</summary>
+    private const int MaxExactDigits = 28;
+
     public double AsDouble => IsDecimal ? (double)Decimal : Double;
 
     public bool IsZero => IsDecimal ? Decimal == 0 : Double == 0;
 
     public bool IsNegative => IsDecimal ? Decimal < 0 : Double < 0;
 
-    public static CalcValue Of(decimal value, bool exact = true) => new(value, 0, IsDecimal: true, exact);
+    /// <summary>
+    /// A decimal, exact unless told otherwise or unless it has as many digits as a decimal can
+    /// hold: past that, decimal arithmetic rounds without saying so (<c>1e28 + 0.4</c> loses the
+    /// 0.4), and the answer must not claim a precision it does not have.
+    /// </summary>
+    public static CalcValue Of(decimal value, bool exact = true) =>
+        new(value, 0, IsDecimal: true, exact && Digits(value) < MaxExactDigits);
+
+    /// <summary>The digits of the decimal's integer mantissa, trailing zeros included.</summary>
+    private static int Digits(decimal value)
+    {
+        var bits = decimal.GetBits(value);
+        var mantissa = ((UInt128)(uint)bits[2] << 64) | ((UInt128)(uint)bits[1] << 32) | (uint)bits[0];
+        return mantissa == 0 ? 1 : mantissa.ToString(CultureInfo.InvariantCulture).Length;
+    }
 
     /// <summary>A double from a function or an overflow; refused in a sentence if it is not a number.</summary>
     public static CalcValue FromDouble(double value)

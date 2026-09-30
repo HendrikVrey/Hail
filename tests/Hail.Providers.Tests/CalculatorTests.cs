@@ -75,6 +75,10 @@ public sealed class CalculatorTests
     [InlineData("2^100", "1.26765060022823E+30")]
     [InlineData("10^40 * 10^40", "1E+80")]
     [InlineData("0.1^40", "1E-40")]
+    [InlineData("1e-30 * 1e30", "1")]
+    [InlineData("1e-35 / 1e-35", "1")]
+    [InlineData("1e-40", "1E-40")]
+    [InlineData("1e28 + 0.4", "10000000000000000000000000000")]
     public void Says_when_it_rounded_and_shows_no_false_precision(string text, string display)
     {
         var answer = Answer(text);
@@ -194,6 +198,16 @@ public sealed class CalculatorTests
     {
         Assert.Equal("round(2,345; 2)", Answer("round(2,345; 2)", Comma).Expression);
         Assert.IsType<CalcOutcome.NotASum>(Comma.Evaluate("max(1, 2)"));
+    }
+
+    [Fact]
+    public void A_number_too_small_for_a_decimal_is_not_zero()
+    {
+        // Planck's constant times the speed of light over a wavelength: about 3.98e-19 joules.
+        var answer = Answer("6.626e-34 * 3e8 / 5e-7");
+
+        Assert.StartsWith("0.00000000000000000039756", answer.Display, StringComparison.Ordinal);
+        Assert.True(answer.IsApproximate);
     }
 
     [Fact]

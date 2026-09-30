@@ -46,7 +46,9 @@ public sealed class WindowsSearchIndex : IFileIndex
             using var connection = new OleDbConnection(ConnectionString);
             connection.Open();
             using var command = new OleDbCommand(sql, connection);
-            using var cancel = ct.Register(command.Cancel);
+            // Cancelling crosses into the search service; a keystroke cancels on the UI thread,
+            // so the call is sent to the pool rather than made in the callback.
+            using var cancel = ct.Register(() => ThreadPool.QueueUserWorkItem(_ => TryCancel(command)));
             using var reader = command.ExecuteReader();
 
             var items = new List<LocalItem>();
@@ -74,6 +76,18 @@ public sealed class WindowsSearchIndex : IFileIndex
         catch (Exception ex) when (ex is OleDbException or COMException or InvalidOperationException)
         {
             return new FileIndexAnswer.Unavailable(NotAnswering);
+        }
+    }
+
+    private static void TryCancel(OleDbCommand command)
+    {
+        try
+        {
+            command.Cancel();
+        }
+        catch (Exception ex) when (ex is OleDbException or InvalidOperationException or ObjectDisposedException)
+        {
+            // The query finished, or the connection closed, before the cancel arrived.
         }
     }
 

@@ -87,8 +87,8 @@ public sealed class CommandsProviderTests
     {
         var provider = await StartedAsync();
 
-        Assert.Equal("Restart", (await provider.RecallAsync("restart", Token))!.Title);
-        Assert.Null(await provider.RecallAsync("empty-recycle-bin", Token));
+        Assert.Equal("Restart", Assert.IsType<Recollection.Found>(await provider.RecallAsync("restart", Token)).Result.Title);
+        Assert.Equal(Recollection.Gone, await provider.RecallAsync("empty-recycle-bin", Token));
     }
 
     [Fact]

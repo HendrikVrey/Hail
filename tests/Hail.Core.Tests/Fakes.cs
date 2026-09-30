@@ -128,20 +128,23 @@ internal class ScriptedProvider(Func<Query, CancellationToken, IAsyncEnumerable<
 }
 
 /// <summary>A scripted provider that can also rebuild results by id.</summary>
-internal sealed class RecallingProvider(Func<string, Result?> recall, bool canRecall = true)
+internal sealed class RecallingProvider(Func<string, ValueTask<Recollection>> recall)
     : ScriptedProvider((_, ct) => Yield([], ct)), IRecall
 {
-    public bool CanRecall { get; set; } = canRecall;
+    public RecallingProvider(Func<string, Recollection> recall)
+        : this(id => ValueTask.FromResult(recall(id)))
+    {
+    }
 
     public List<string> Asked { get; } = [];
 
-    public ValueTask<Result?> RecallAsync(string id, CancellationToken ct)
+    public ValueTask<Recollection> RecallAsync(string id, CancellationToken ct)
     {
         lock (Asked)
         {
             Asked.Add(id);
         }
 
-        return ValueTask.FromResult(recall(id));
+        return recall(id);
     }
 }

@@ -162,7 +162,11 @@ internal static class CalcLexer
 
         var source = literal.ToString();
         const NumberStyles styles = NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent;
-        if (decimal.TryParse(source, styles, CultureInfo.InvariantCulture, out var exact))
+        // A literal below decimal's smallest step (1e-30) parses as 0 rather than failing, so a
+        // zero with a non-zero digit in it goes to the double instead.
+        var mantissa = source.Split('e')[0];
+        if (decimal.TryParse(source, styles, CultureInfo.InvariantCulture, out var exact)
+            && (exact != 0 || !mantissa.Any(c => c is >= '1' and <= '9')))
         {
             return new Token(TokenKind.Number, start, text[start..i], CalcValue.Of(exact));
         }

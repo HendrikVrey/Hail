@@ -67,10 +67,10 @@ public sealed class CommandsProvider(ISessionControl session, IHostCommands host
         await Task.CompletedTask.ConfigureAwait(false);
     }
 
-    public bool CanRecall => _commands.Count > 0;
-
-    public ValueTask<Result?> RecallAsync(string id, CancellationToken ct) =>
-        ValueTask.FromResult(_commands.FirstOrDefault(c => c.Id == id)?.ToResult(1.0, highlight: null));
+    public ValueTask<Recollection> RecallAsync(string id, CancellationToken ct) =>
+        ValueTask.FromResult(_commands.FirstOrDefault(c => c.Id == id) is { } command
+            ? Recollection.Of(command.ToResult(1.0, highlight: null))
+            : Recollection.Gone);
 
     private IReadOnlyList<Command> Build(IPluginContext context) =>
     [

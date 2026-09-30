@@ -39,7 +39,11 @@ public sealed record Result(
 /// <summary>Something a result can do.</summary>
 /// <param name="Title">"Open", "Run as administrator", "Copy result".</param>
 /// <param name="Gesture">The chord that runs it; the row names it.</param>
-/// <param name="Execute">The action itself.</param>
+/// <param name="Execute">
+/// The action itself. Runs on a background thread. The host waits for it a few seconds at most
+/// (a launch behind Windows' own elevation prompt included), then cancels the token, stops
+/// waiting and says so in the box; an action that ignores the token finishes into nothing.
+/// </param>
 public sealed record ResultAction(
     string Title,
     Gesture Gesture,

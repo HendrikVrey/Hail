@@ -66,7 +66,7 @@ public sealed class SupervisorTests
     public async Task A_debounced_provider_joins_in_a_later_update()
     {
         var supervisor = new Supervisor(
-            [Register("apps", ScriptedProvider.Returning(Fakes.Result("app"))), Register("files", ScriptedProvider.Returning(Fakes.Result("file")), debounceMs: 50)],
+            [Register("apps", ScriptedProvider.Returning(Fakes.Result("app"))), Register("files", ScriptedProvider.Returning(Fakes.Result("file")), debounceMs: 400)],
             _log,
             Options());
 
@@ -82,8 +82,10 @@ public sealed class SupervisorTests
     [Fact]
     public async Task A_slow_provider_does_not_hold_the_first_frame_past_its_budget()
     {
-        var slow = new ScriptedProvider((_, ct) => Delayed(400, ct, Fakes.Result("slow")));
-        var supervisor = new Supervisor([Register("fast", ScriptedProvider.Returning(Fakes.Result("fast"))), Register("slow", slow)], _log, Options(firstFrameMs: 40));
+        // Margins wide enough for a loaded test machine: the fast one answers well inside the
+        // first frame's budget, and the slow one well outside it.
+        var slow = new ScriptedProvider((_, ct) => Delayed(1000, ct, Fakes.Result("slow")));
+        var supervisor = new Supervisor([Register("fast", ScriptedProvider.Returning(Fakes.Result("fast"))), Register("slow", slow)], _log, Options(firstFrameMs: 200));
 
         var updates = await RunAsync(supervisor, "x");
 
@@ -255,7 +257,7 @@ public sealed class SupervisorTests
     [Fact]
     public async Task Recall_rebuilds_remembered_results_in_the_order_asked()
     {
-        var apps = new RecallingProvider(id => id == "gone" ? null : Fakes.Result(id));
+        var apps = new RecallingProvider(id => id == "gone" ? Recollection.Gone : Recollection.Of(Fakes.Result(id)));
         var supervisor = new Supervisor([Register("apps", apps)], _log, Options());
 
         var outcome = await supervisor.RecallAsync([new("apps", "b"), new("apps", "gone"), new("apps", "a")], Token);
@@ -266,16 +268,45 @@ public sealed class SupervisorTests
     }
 
     [Fact]
-    public async Task Recall_asks_nothing_and_forgets_nothing_before_a_provider_is_ready()
+    public async Task What_a_provider_cannot_tell_is_neither_shown_nor_forgotten()
     {
-        var apps = new RecallingProvider(_ => null, canRecall: false);
-        var supervisor = new Supervisor([Register("apps", apps)], _log, Options());
+        var files = new RecallingProvider(_ => Recollection.Unknown);
+        var supervisor = new Supervisor([Register("files", files)], _log, Options());
 
-        var outcome = await supervisor.RecallAsync([new("apps", "a")], Token);
+        var outcome = await supervisor.RecallAsync([new("files", @"E:\on a usb stick.txt")], Token);
 
         Assert.Empty(outcome.Found);
         Assert.Empty(outcome.Gone);
-        Assert.Empty(apps.Asked);
+    }
+
+    [Fact]
+    public async Task A_slow_recall_is_one_fault_however_many_results_it_was_slow_on()
+    {
+        var never = new TaskCompletionSource<Recollection>();
+        var files = new RecallingProvider(_ => new ValueTask<Recollection>(never.Task));
+        var supervisor = new Supervisor([Register("files", files)], _log, Options(hardMs: 100));
+
+        var keys = Enumerable.Range(0, 16).Select(i => new UsageKey("files", $@"Z:\{i}.txt")).ToArray();
+        await supervisor.RecallAsync(keys, Token);
+        await supervisor.RecallAsync(keys, Token);
+
+        Assert.Equal(2, _log.Lines.Count(l => l.Contains("files faulted", StringComparison.Ordinal)));
+        Assert.False(supervisor.IsDisabled("files"));
+    }
+
+    [Fact]
+    public async Task A_providers_exception_message_never_reaches_the_log()
+    {
+        var supervisor = new Supervisor(
+            [Register("leaky", new ScriptedProvider((q, _) => ThrowingWith($"could not open https://example.com/?q={q.Search}")))],
+            _log,
+            Options());
+
+        await RunAsync(supervisor, "my secret search");
+
+        var line = Assert.Single(_log.Errors());
+        Assert.Contains("System.InvalidOperationException", line, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret", line, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -292,7 +323,7 @@ public sealed class SupervisorTests
     [Fact]
     public async Task A_recall_that_throws_is_a_fault_and_forgets_nothing()
     {
-        var apps = new RecallingProvider(_ => throw new InvalidOperationException("bug"));
+        var apps = new RecallingProvider((Func<string, Recollection>)(_ => throw new InvalidOperationException("bug")));
         var supervisor = new Supervisor([Register("apps", apps)], _log, Options());
 
         var outcome = await supervisor.RecallAsync([new("apps", "a")], Token);
@@ -309,6 +340,15 @@ public sealed class SupervisorTests
         {
             yield return result;
         }
+    }
+
+    private static async IAsyncEnumerable<Result> ThrowingWith(string message)
+    {
+        await Task.Yield();
+        throw new InvalidOperationException(message);
+#pragma warning disable CS0162 // Unreachable: the yield makes this an iterator.
+        yield break;
+#pragma warning restore CS0162
     }
 
     private static async IAsyncEnumerable<Result> Throwing()

@@ -48,6 +48,12 @@ public interface ILocalFiles
     /// </summary>
     FolderListing List(string folder, int max, CancellationToken ct);
 
-    /// <summary>The item at <paramref name="path"/>, or null when it no longer exists.</summary>
+    /// <summary>The item at <paramref name="path"/>, or null when it is not there now.</summary>
     LocalItem? Describe(string path);
+
+    /// <summary>
+    /// Whether the drive <paramref name="path"/> is on is there, so a missing item is known to
+    /// be gone rather than on a USB stick that is unplugged.
+    /// </summary>
+    bool IsDrivePresent(string path);
 }

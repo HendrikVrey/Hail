@@ -92,21 +92,19 @@ public sealed class AppsProviderTests
     {
         var provider = await StartedAsync();
 
-        var result = await provider.RecallAsync(Notepad.ToUpperInvariant(), Token);
+        var found = Assert.IsType<Recollection.Found>(await provider.RecallAsync(Notepad.ToUpperInvariant(), Token));
 
-        Assert.Equal("Notepad", result!.Title);
-        Assert.Null(await provider.RecallAsync("Uninstalled.App_0!App", Token));
+        Assert.Equal("Notepad", found.Result.Title);
+        Assert.Equal(Recollection.Gone, await provider.RecallAsync("Uninstalled.App_0!App", Token));
     }
 
     [Fact]
-    public async Task Nothing_is_recalled_before_the_start_menu_is_read()
+    public async Task Before_the_start_menu_is_read_nothing_is_said_to_be_gone()
     {
         var provider = await StartedAsync();
-        Assert.True(provider.CanRecall);
-
         _catalog.Replace();
 
-        Assert.False(provider.CanRecall);
+        Assert.Equal(Recollection.Unknown, await provider.RecallAsync(Notepad, Token));
     }
 
     [Fact]

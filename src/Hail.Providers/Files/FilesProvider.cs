@@ -92,8 +92,6 @@ public sealed class FilesProvider(IFileIndex index, ILocalFiles files) : IProvid
         }
     }
 
-    public bool CanRecall => true;
-
     /// <summary>
     /// A shortcut in either Start menu folder is an app, and the apps provider already lists it
     /// by its proper name; as a file it would be the same thing twice, as <em>Notepad++.lnk</em>.
@@ -104,11 +102,18 @@ public sealed class FilesProvider(IFileIndex index, ILocalFiles files) : IProvid
         return path.Contains(@"\Microsoft\Windows\Start Menu\", StringComparison.OrdinalIgnoreCase);
     }
 
-    public ValueTask<Result?> RecallAsync(string id, CancellationToken ct)
+    /// <remarks>
+    /// A file on a drive that is not there now (a USB stick unplugged) cannot be told gone:
+    /// history keeps it for when the drive is back.
+    /// </remarks>
+    public ValueTask<Recollection> RecallAsync(string id, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(id);
         var item = files.Describe(id);
-        return ValueTask.FromResult(item is null ? null : ToResult(item, relevance: 1.0, highlight: null, Context()));
+        var answer = item is not null ? Recollection.Of(ToResult(item, relevance: 1.0, highlight: null, Context()))
+            : files.IsDrivePresent(id) ? Recollection.Gone
+            : Recollection.Unknown;
+        return ValueTask.FromResult(answer);
     }
 
     private IEnumerable<Result> ListFolder(string folder, string partial, IPluginContext context, CancellationToken ct)

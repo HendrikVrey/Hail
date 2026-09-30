@@ -141,9 +141,16 @@ public sealed class FilesProviderTests
         _files.Items[path] = new LocalItem(path, "notes.txt", IsFolder: false);
         var provider = await StartedAsync();
 
-        Assert.True(provider.CanRecall);
-        Assert.Equal("notes.txt", (await provider.RecallAsync(path, Token))!.Title);
-        Assert.Null(await provider.RecallAsync(@"C:\deleted.txt", Token));
+        Assert.Equal("notes.txt", Assert.IsType<Recollection.Found>(await provider.RecallAsync(path, Token)).Result.Title);
+        Assert.Equal(Recollection.Gone, await provider.RecallAsync(@"C:\deleted.txt", Token));
+    }
+
+    [Fact]
+    public async Task A_file_on_a_drive_that_is_not_there_is_not_forgotten()
+    {
+        var provider = await StartedAsync();
+
+        Assert.Equal(Recollection.Unknown, await provider.RecallAsync(@"E:\on the usb stick.txt", Token));
     }
 
     [Theory]
@@ -185,5 +192,7 @@ public sealed class FilesProviderTests
             Folders.TryGetValue(folder, out var items) ? new FolderListing([.. items.Take(max)], Exists: true) : FolderListing.Missing;
 
         public LocalItem? Describe(string path) => Items.GetValueOrDefault(path);
+
+        public bool IsDrivePresent(string path) => path.StartsWith(@"C:\", StringComparison.OrdinalIgnoreCase);
     }
 }

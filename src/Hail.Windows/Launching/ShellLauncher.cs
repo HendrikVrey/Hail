@@ -50,13 +50,14 @@ public sealed class ShellLauncher(ShellAppCatalog catalog, StaWorker worker) : I
 
     public async ValueTask OpenPathAsync(string path, CancellationToken ct)
     {
-        RequireLocal(path);
+        // Asking the disk can stall (a drive spinning up); it is not the UI thread's to wait on.
+        await Task.Run(() => RequireLocal(path), ct).ConfigureAwait(false);
         await ShellExecuteAsync(path, verb: null, ct).ConfigureAwait(false);
     }
 
     public async ValueTask ShowInFolderAsync(string path, CancellationToken ct)
     {
-        RequireLocal(path);
+        await Task.Run(() => RequireLocal(path), ct).ConfigureAwait(false);
         AllowForeground();
 
         // SHOpenFolderAndSelectItems rather than "explorer /select,<path>": nothing is put on a

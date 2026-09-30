@@ -58,6 +58,9 @@ public sealed class LocalFiles : ILocalFiles
         }
     }
 
+    public bool IsDrivePresent(string path) =>
+        LocalPaths.IsAcceptable(path) && Directory.Exists(Path.GetPathRoot(path));
+
     public LocalItem? Describe(string path)
     {
         if (!LocalPaths.IsAcceptable(path))

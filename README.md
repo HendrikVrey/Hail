@@ -18,7 +18,8 @@ same plugin contract (`Hail.Sdk`, MIT) a stranger would use.
   letters are in bold.
 - **Files** by name, from the Windows Search index: only the folders Windows is told to index
   (by default your own). Type a path (`C:\Users\`, `~\Doc`) to list a folder instead; **Tab**
-  completes the highlighted entry.
+  completes the highlighted entry. Network paths and mapped network drives are neither listed
+  nor opened: each keystroke would reach the server.
 - **Sums** as you type: `15% of 240`, `2^10`, `sqrt(2)`, `2pi`, `0xFF + 1`. Start with `=` to
   force it. Your region's decimal separator works (`0,1 + 0,2`), and so does the point.
 - **Web search**: a keyword first picks the engine (`g`, `ddg`, `b`, `yt`, `gh`, `w`), and

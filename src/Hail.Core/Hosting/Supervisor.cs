@@ -177,13 +177,21 @@ public sealed class Supervisor
 
     /// <summary>
     /// Asks the providers of remembered results to rebuild them, for the empty box. A provider
-    /// that fails or overruns here counts a fault as it would on a query.
+    /// that fails or overruns here counts one fault for the whole batch, however many of its
+    /// results it failed on: sixteen remembered files on a slow drive are one slow provider.
     /// </summary>
     public async Task<RecallOutcome> RecallAsync(IReadOnlyList<UsageKey> keys, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(keys);
 
         var outcomes = await Task.WhenAll(keys.Select(key => RecallOneAsync(key, ct))).ConfigureAwait(false);
+
+        foreach (var failed in outcomes.Where(o => o.Fault is not null).GroupBy(o => o.Registration!.Id))
+        {
+            var first = failed.First();
+            RecordFault(first.Registration!, first.Fault!);
+        }
+
         return new RecallOutcome(
             [.. outcomes.Where(o => o.Found is not null).Select(o => o.Found!)],
             [.. outcomes.Where(o => o.Gone).Select(o => o.Key)]);
@@ -216,7 +224,7 @@ public sealed class Supervisor
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            _log.LogError($"Running provider {registration.Id} failed inside the host.", ex);
+            _log.LogError($"Running provider {registration.Id} failed inside the host: {Redaction.Describe(ex)}");
         }
 
         writer.TryWrite(new Batch(results, IsImmediate(registration)));
@@ -282,13 +290,13 @@ public sealed class Supervisor
 #pragma warning restore CA1031
         {
             // The query's length, never its text (Hail.md §9).
-            _log.LogError($"Provider {registration.Id} failed a query of {target.Query.RawText.Length} characters; its results were dropped.", ex);
+            _log.LogError($"Provider {registration.Id} failed a query of {target.Query.RawText.Length} characters; its results were dropped: {Redaction.Describe(ex)}");
             RecordFault(registration, "it failed while searching");
             return [];
         }
     }
 
-    private async Task<(UsageKey Key, ProviderResult? Found, bool Gone)> RecallOneAsync(UsageKey key, CancellationToken ct)
+    private async Task<Recalled> RecallOneAsync(UsageKey key, CancellationToken ct)
     {
         var order = -1;
         for (var i = 0; i < _providers.Count; i++)
@@ -303,26 +311,26 @@ public sealed class Supervisor
         // A provider that is not here today (switched off in settings, say) keeps its history.
         if (order < 0 || _providers[order] is not { Provider: IRecall recall } registration || IsDisabled(registration.Id))
         {
-            return (key, null, false);
+            return new Recalled(key);
         }
 
         try
         {
-            if (!await EnsureInitialisedAsync(registration, ct).ConfigureAwait(false) || !recall.CanRecall)
+            if (!await EnsureInitialisedAsync(registration, ct).ConfigureAwait(false))
             {
-                return (key, null, false);
+                return new Recalled(key);
             }
 
-            var result = await Task.Run(() => recall.RecallAsync(key.ResultId, ct).AsTask(), CancellationToken.None)
-                .WaitAsync(_options.HardBudget, _time, ct)
-                .ConfigureAwait(false);
+            var asked = Task.Run(() => recall.RecallAsync(key.ResultId, ct).AsTask(), CancellationToken.None);
+            _ = asked.ContinueWith(done => _ = done.Exception, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            var answer = await asked.WaitAsync(_options.HardBudget, _time, ct).ConfigureAwait(false);
 
-            if (result is null)
+            return answer switch
             {
-                return (key, null, true);
-            }
-
-            return IsWellFormed(result) ? (key, new ProviderResult(result, order, registration.Id), false) : (key, null, false);
+                Recollection.Found { Result: var result } when IsWellFormed(result) => new Recalled(key, Found: new ProviderResult(result, order, registration.Id)),
+                Recollection.GoneRecollection => new Recalled(key, Gone: true),
+                _ => new Recalled(key),
+            };
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -330,16 +338,14 @@ public sealed class Supervisor
         }
         catch (TimeoutException)
         {
-            RecordFault(registration, "it did not answer in time when asked for a remembered result");
-            return (key, null, false);
+            return new Recalled(key, Registration: registration, Fault: "it did not answer in time when asked for a remembered result");
         }
 #pragma warning disable CA1031 // As in CollectAsync: the provider's failure is its own.
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            _log.LogError($"Provider {registration.Id} failed to rebuild a remembered result.", ex);
-            RecordFault(registration, "it failed when asked for a remembered result");
-            return (key, null, false);
+            _log.LogError($"Provider {registration.Id} failed to rebuild a remembered result: {Redaction.Describe(ex)}");
+            return new Recalled(key, Registration: registration, Fault: "it failed when asked for a remembered result");
         }
     }
 
@@ -383,7 +389,7 @@ public sealed class Supervisor
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            _log.LogError($"Provider {registration.Id} failed to start and is switched off until Hail restarts.", ex);
+            _log.LogError($"Provider {registration.Id} failed to start and is switched off until Hail restarts: {Redaction.Describe(ex)}");
             Disable(registration, "it failed to start");
             return false;
         }
@@ -457,4 +463,7 @@ public sealed class Supervisor
         && result.Secondary.All(a => a is { Execute: not null, Title: not null });
 
     private sealed record Batch(IReadOnlyList<ProviderResult> Results, bool Immediate);
+
+    /// <summary>One remembered key's answer; a fault is recorded once per provider per batch.</summary>
+    private sealed record Recalled(UsageKey Key, ProviderResult? Found = null, bool Gone = false, ProviderRegistration? Registration = null, string? Fault = null);
 }

@@ -41,6 +41,28 @@ public sealed class FilesAndStartupTests : IDisposable
         Assert.Equal(acceptable, LocalPaths.IsAcceptable(path));
     }
 
+    [Theory]
+    [InlineData(@"\\server.invalid\share\x.txt")]
+    [InlineData(@"relative.txt")]
+    public async Task An_icon_is_never_asked_of_anything_but_an_app_or_a_local_path(string parsingName)
+    {
+        using var worker = new StaWorker("icon rule");
+        var started = DateTime.UtcNow;
+
+        Assert.Null(await new Icons.ShellIcons(worker).LoadAsync(parsingName, 32, Token));
+        Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(1), "The shell was asked, and went looking.");
+    }
+
+    [Fact]
+    public void A_drive_that_is_there_is_present_and_one_that_is_not_is_not()
+    {
+        var files = new LocalFiles();
+        var missing = Enumerable.Range('D', 23).Select(c => (char)c).First(c => !Directory.Exists($@"{c}:\"));
+
+        Assert.True(files.IsDrivePresent(@"C:\anything.txt"));
+        Assert.False(files.IsDrivePresent($@"{missing}:\anything.txt"));
+    }
+
     [Fact]
     public void A_folder_is_listed_without_its_hidden_entries()
     {
