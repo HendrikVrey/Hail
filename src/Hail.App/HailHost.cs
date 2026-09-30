@@ -1,15 +1,29 @@
+using System.Globalization;
+using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using Hail.Core.History;
 using Hail.Core.Hosting;
 using Hail.Core.Matching;
+using Hail.Core.Ports;
+using Hail.Core.Settings;
 using Hail.Persistence;
 using Hail.Providers.Apps;
+using Hail.Providers.Calculator;
+using Hail.Providers.Commands;
+using Hail.Providers.Files;
+using Hail.Providers.Web;
+using Hail.Sdk;
 using Hail.Windows;
 using Hail.Windows.Apps;
+using Hail.Windows.Files;
 using Hail.Windows.Hotkeys;
 using Hail.Windows.Icons;
+using Hail.Windows.Launching;
+using Hail.Windows.Session;
+using Hail.Windows.Startup;
 using Hail.Windows.Tray;
 using Hail.Windows.Windowing;
 using Wpf.Ui.Appearance;
@@ -20,36 +34,56 @@ namespace Hail.App;
 /// The composition root and the process's lifetime: it builds everything once, answers the
 /// hotkey, the tray and a second start, and takes it all down on Quit.
 /// </summary>
-internal sealed class HailHost(SingleInstance instance, FileLog log) : IDisposable
+internal sealed class HailHost(SingleInstance instance, FileLog log, HailPaths paths) : IDisposable, IHostCommands
 {
+    /// <summary>
+    /// How long typing must pause before the Windows Search index is asked: a word is one
+    /// query, not one per letter (Hail.md §6.4).
+    /// </summary>
+    private static readonly TimeSpan FilesDebounce = TimeSpan.FromMilliseconds(150);
+
+    /// <summary>History is written this long after the last change, so a burst of picks is one write.</summary>
+    private static readonly TimeSpan HistorySaveDelay = TimeSpan.FromSeconds(2);
+
     private readonly HotkeyChord _chord = HotkeyChord.AltSpace;
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly StartupRegistration _startup = new();
+    private readonly Lock _saveGate = new();
 
     private StaWorker? _worker;
     private ShellAppCatalog? _catalog;
+    private ShellLauncher? _launcher;
+    private Supervisor? _supervisor;
+    private UsageStore? _usageStore;
+    private UsageHistory? _history;
     private SearchWindow? _box;
     private HostWindow? _host;
     private TrayIcon? _tray;
     private bool _hotkeyRegistered;
+    private bool _savePending;
     private bool _disposed;
+
+    public string SettingsPath => paths.Settings;
 
     public void Start()
     {
         log.LogInfo($"Hail {Version()} starting.");
 
+        var settings = LoadSettings();
+        _history = LoadHistory();
+        _history.Changed += ScheduleHistorySave;
+
         _worker = new StaWorker("Hail shell worker");
         _catalog = new ShellAppCatalog(_worker);
+        _launcher = new ShellLauncher(_catalog, _worker);
 
-        // Every provider is registered by hand, in order: no assembly scanning at startup.
-        var matcher = new FuzzyMatcher();
-        var apps = new ProviderRegistration(
-            AppsProvider.ProviderId,
-            new AppsProvider(_catalog),
-            new PluginContext(AppsProvider.ProviderId, new ShellAppLauncher(_catalog), matcher, log));
-        var runner = new QueryRunner([apps], log);
+        _supervisor = new Supervisor(Providers(settings), log);
+        _supervisor.FaultsChanged += () => log.LogInfo($"Providers switched off: {string.Join(", ", _supervisor.Faults.Select(f => f.ProviderId))}.");
 
-        var model = new SearchViewModel(runner, new IconCache(new ShellIcons(_worker)), log);
-        _box = new SearchWindow(model, log);
+        var parser = new QueryParser(_supervisor.Providers);
+        var model = new SearchViewModel(_supervisor, parser, _history, new IconCache(new ShellIcons(_worker)), log);
+        _box = new SearchWindow(model, log, settings.KeepLastQuery);
+        _box.SettingsRequested += () => _ = OpenSettingsAsync();
         _box.Prepare();
 
         _host = new HostWindow();
@@ -66,6 +100,10 @@ internal sealed class HailHost(SingleInstance instance, FileLog log) : IDisposab
         _ = ListenForSecondStartAsync();
     }
 
+    /// <summary>The box's "Quit Hail": after the action that asked has finished and the box has hidden.</summary>
+    public void Quit() =>
+        Application.Current.Dispatcher.BeginInvoke(() => Quit("the box"), System.Windows.Threading.DispatcherPriority.Background);
+
     public void Dispose()
     {
         if (_disposed)
@@ -81,12 +119,151 @@ internal sealed class HailHost(SingleInstance instance, FileLog log) : IDisposab
             GlobalHotkey.Unregister(_host.Handle, HostWindow.HotkeyId);
         }
 
+        SaveHistoryNow("quitting", onlyIfChanged: true);
+
         _tray?.Dispose();
         _box?.CloseForQuit();
         _host?.Dispose();
         _worker?.Dispose();
         instance.Dispose();
         _lifetime.Dispose();
+    }
+
+    /// <summary>
+    /// Every provider, registered by hand and in order (no assembly scanning at startup). The
+    /// order breaks ties: apps before files of the same name, and the web search last.
+    /// </summary>
+    private List<ProviderRegistration> Providers(HailSettings settings)
+    {
+        var matcher = new FuzzyMatcher();
+        var clipboard = new WpfClipboard(Application.Current.Dispatcher);
+        PluginContext Context(string id) => new(id, _launcher!, matcher, clipboard, log);
+
+        var web = new WebSearchProvider(settings.WebSearch);
+        foreach (var problem in web.Load())
+        {
+            log.LogError(problem);
+        }
+
+        var all = new List<ProviderRegistration>
+        {
+            new(AppsProvider.ProviderId, "Apps", new AppsProvider(_catalog!), Context(AppsProvider.ProviderId)),
+            new(CalculatorProvider.ProviderId, "Calculator", new CalculatorProvider(CultureInfo.CurrentCulture), Context(CalculatorProvider.ProviderId))
+            {
+                Keywords = [new ProviderKeyword(CalculatorProvider.Keyword, "Calculator")],
+            },
+            new(FilesProvider.ProviderId, "Files", new FilesProvider(new WindowsSearchIndex(), new LocalFiles()), Context(FilesProvider.ProviderId))
+            {
+                Debounce = FilesDebounce,
+            },
+            new(CommandsProvider.ProviderId, "Commands", new CommandsProvider(new SessionControl(), this), Context(CommandsProvider.ProviderId)),
+            new(WebSearchProvider.ProviderId, "Web search", web, Context(WebSearchProvider.ProviderId))
+            {
+                Keywords = [.. web.Keywords.Select(k => new ProviderKeyword(k.Keyword, k.Name))],
+            },
+        };
+
+        foreach (var off in all.Where(p => !settings.IsEnabled(p.Id)))
+        {
+            log.LogInfo($"Provider {off.Id} is switched off in settings.");
+        }
+
+        var enabled = all.Where(p => settings.IsEnabled(p.Id)).ToList();
+        ReportKeywordClashes(enabled);
+        return enabled;
+    }
+
+    private void ReportKeywordClashes(IReadOnlyList<ProviderRegistration> providers)
+    {
+        var owners = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var provider in providers)
+        {
+            foreach (var keyword in provider.Keywords)
+            {
+                if (!owners.TryAdd(keyword.Keyword, provider.Id))
+                {
+                    log.LogError($"The keyword \"{keyword.Keyword}\" of {provider.Id} is already {owners[keyword.Keyword]}'s; the first keeps it.");
+                }
+            }
+        }
+    }
+
+    private HailSettings LoadSettings()
+    {
+        var load = new SettingsStore(paths).Load();
+        foreach (var problem in load.Problems)
+        {
+            log.LogError($"Settings: {problem}");
+        }
+
+        return load.Settings;
+    }
+
+    private UsageHistory LoadHistory()
+    {
+        _usageStore = new UsageStore(paths);
+        var history = _usageStore.Load(DateTimeOffset.UtcNow, out var problem);
+        if (problem is not null)
+        {
+            log.LogError($"History: {problem}");
+        }
+
+        return history;
+    }
+
+    private void ScheduleHistorySave()
+    {
+        lock (_saveGate)
+        {
+            if (_savePending || _disposed)
+            {
+                return;
+            }
+
+            _savePending = true;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(HistorySaveDelay, _lifetime.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return; // Quitting; Dispose saves.
+            }
+
+            SaveHistoryNow("a pick");
+        });
+    }
+
+    /// <param name="onlyIfChanged">True on quitting: a history nobody changed is not rewritten.</param>
+    private void SaveHistoryNow(string reason, bool onlyIfChanged = false)
+    {
+        lock (_saveGate)
+        {
+            if (onlyIfChanged && !_savePending)
+            {
+                return;
+            }
+
+            _savePending = false;
+        }
+
+        if (_history is null || _usageStore is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _usageStore.Save(_history.ToSnapshot());
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            log.LogError($"Saving history failed ({reason}); it is tried again on the next change.", ex);
+        }
     }
 
     private void RegisterHotkey()
@@ -144,16 +321,43 @@ internal sealed class HailHost(SingleInstance instance, FileLog log) : IDisposab
 
     private void ShowTrayMenu()
     {
+        var menu = new ContextMenu { Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint };
+
         var open = new MenuItem { Header = "Open Hail", InputGestureText = _hotkeyRegistered ? _chord.Display : string.Empty };
         open.Click += (_, _) => Summon();
-
-        var quit = new MenuItem { Header = "Quit Hail" };
-        quit.Click += (_, _) => Quit("the tray");
-
-        var menu = new ContextMenu { Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint };
         menu.Items.Add(open);
         menu.Items.Add(new Separator());
+
+        menu.Items.Add(StartupItem());
+
+        var settings = new MenuItem { Header = "Open settings file" };
+        settings.Click += (_, _) => _ = OpenSettingsAsync();
+        menu.Items.Add(settings);
+
+        var clear = new MenuItem { Header = "Clear history", IsEnabled = _history?.Count > 0 };
+        clear.Click += (_, _) =>
+        {
+            _history?.Clear();
+            log.LogInfo("History cleared from the tray.");
+        };
+        menu.Items.Add(clear);
+
+        // A provider switched off says so here (Hail.md §6.5), until the settings window exists.
+        var faults = _supervisor?.Faults ?? [];
+        if (faults.Count > 0)
+        {
+            menu.Items.Add(new Separator());
+            foreach (var fault in faults)
+            {
+                menu.Items.Add(new MenuItem { Header = $"{fault.ProviderName} is off: {fault.Reason}", IsEnabled = false });
+            }
+        }
+
+        menu.Items.Add(new Separator());
+        var quit = new MenuItem { Header = "Quit Hail" };
+        quit.Click += (_, _) => Quit("the tray");
         menu.Items.Add(quit);
+
         menu.IsOpen = true;
 
         // A menu opened from the notification area belongs to a process that is not in the
@@ -162,6 +366,64 @@ internal sealed class HailHost(SingleInstance instance, FileLog log) : IDisposab
         if (PresentationSource.FromVisual(menu) is HwndSource source)
         {
             WindowEffects.BringToFront(source.Handle);
+        }
+    }
+
+    /// <summary>"Start with Windows", read from the registry each time the menu opens (Hail.md §5).</summary>
+    private MenuItem StartupItem()
+    {
+        var executable = Environment.ProcessPath;
+        var state = executable is null ? StartupState.Off : _startup.StateFor(executable);
+        var item = new MenuItem
+        {
+            Header = state switch
+            {
+                StartupState.DisabledByUser => "Start with Windows (switched off in Task Manager)",
+                StartupState.OnElsewhere => "Start with Windows (another copy of Hail is registered)",
+                _ => "Start with Windows",
+            },
+            IsCheckable = true,
+            IsChecked = state == StartupState.On,
+            IsEnabled = executable is not null,
+        };
+
+        item.Click += (_, _) =>
+        {
+            try
+            {
+                if (state == StartupState.On)
+                {
+                    _startup.Disable();
+                    log.LogInfo("Start at sign-in switched off.");
+                }
+                else
+                {
+                    _startup.Enable(executable!);
+                    log.LogInfo("Start at sign-in switched on.");
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+            {
+                log.LogError("Changing start at sign-in failed.", ex);
+                _tray?.Notify("Start with Windows", "Windows would not let Hail change this. The log has the reason.");
+            }
+        };
+
+        return item;
+    }
+
+    private async Task OpenSettingsAsync()
+    {
+        try
+        {
+            await _launcher!.OpenPathAsync(paths.Settings, _lifetime.Token).ConfigureAwait(true);
+        }
+#pragma warning disable CA1031 // Opening an editor failed; said in the log and the tray, and Hail carries on.
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            log.LogError("Opening the settings file failed.", ex);
+            _tray?.Notify("Hail settings", $"The settings file could not be opened. It is {paths.Settings}.");
         }
     }
 

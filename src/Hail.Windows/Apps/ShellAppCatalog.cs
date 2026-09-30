@@ -22,9 +22,10 @@ public sealed record CatalogRefresh(int Count, int Packaged, TimeSpan Elapsed);
 /// list or the new one, never a list being built.
 /// </para>
 /// <para>
-/// M0 refreshes at startup and when the box is summoned, if the last read is older than
-/// <see cref="StaleAfter"/>. Change notifications on the Start Menu folders and the package
-/// catalogue replace that in M1.
+/// Read at startup and again when the box is summoned, if the last read is older than
+/// <see cref="StaleAfter"/>, off the UI thread and with no timer running while the box is
+/// hidden. Change notifications on the Start Menu folders and the package catalogue (Hail.md
+/// §7.1) would replace that; they wait until a stale list is seen to matter.
 /// </para>
 /// </remarks>
 public sealed class ShellAppCatalog(StaWorker worker) : IAppCatalog
@@ -68,11 +69,8 @@ public sealed class ShellAppCatalog(StaWorker worker) : IAppCatalog
         }
     }
 
-    /// <summary>
-    /// A packaged app's id is its AppUserModelID, which is always a package family name and an
-    /// application id joined by '!'. A desktop app's never contains one.
-    /// </summary>
-    public static bool IsPackaged(string id) => id.Contains('!', StringComparison.Ordinal);
+    /// <summary>Whether <paramref name="id"/> is a packaged app's (<see cref="AppsFolder.IsPackagedId"/>).</summary>
+    public static bool IsPackaged(string id) => AppsFolder.IsPackagedId(id);
 
     private static List<AppEntry> ReadAppsFolder()
     {

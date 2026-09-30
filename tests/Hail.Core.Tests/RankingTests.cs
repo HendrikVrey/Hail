@@ -1,29 +1,32 @@
 using Hail.Core.Ranking;
+using Hail.Sdk;
 
 namespace Hail.Core.Tests;
 
 public sealed class RankingTests
 {
+    private static string[] Ids(IEnumerable<ProviderResult> results) => [.. results.Select(r => r.Result.Id)];
+
     [Fact]
     public void Relevance_orders_first_then_provider_then_title_then_id()
     {
         var ranked = Ranker.Rank(
             [
-                new(Fakes.Result("b", 0.5), 1),
-                new(Fakes.Result("a", 0.5), 1),
-                new(Fakes.Result("z", 0.5), 0),
-                new(Fakes.Result("top", 0.9), 2),
-                new(Fakes.Result("a", 0.5, id: "a-second"), 1),
+                Fakes.Row("b", 0.5, order: 1),
+                Fakes.Row("a", 0.5, order: 1),
+                Fakes.Row("z", 0.5, order: 0),
+                Fakes.Row("top", 0.9, order: 2),
+                Fakes.At(Fakes.Result("a", 0.5, id: "a-second"), 1),
             ],
             limit: 10);
 
-        Assert.Equal(["top", "z", "a", "a-second", "b"], ranked.Select(r => r.Id));
+        Assert.Equal(["top", "z", "a", "a-second", "b"], Ids(ranked));
     }
 
     [Fact]
     public void The_limit_is_the_number_of_rows()
     {
-        var many = Enumerable.Range(0, 20).Select(i => new ProviderResult(Fakes.Result($"r{i:00}"), 0));
+        var many = Enumerable.Range(0, 20).Select(i => Fakes.Row($"r{i:00}"));
         Assert.Equal(8, Ranker.Rank(many, 8).Count);
     }
 
@@ -40,53 +43,51 @@ public sealed class RankingTests
     [Fact]
     public void A_nan_relevance_sinks_rather_than_poisoning_the_order()
     {
+        var ranked = Ranker.Rank([Fakes.Row("nan", double.NaN), Fakes.Row("low", 0.1), Fakes.Row("high", 0.9)], limit: 3);
+
+        Assert.Equal(["high", "low", "nan"], Ids(ranked));
+    }
+
+    [Fact]
+    public void History_reorders_close_matches()
+    {
         var ranked = Ranker.Rank(
-            [new(Fakes.Result("nan", double.NaN), 0), new(Fakes.Result("low", 0.1), 0), new(Fakes.Result("high", 0.9), 0)],
-            limit: 3);
+            [Fakes.Row("Visual Studio", 0.62), Fakes.Row("VLC", 0.6)],
+            limit: 2,
+            history: r => r.Result.Id == "VLC" ? 0.4 : 0);
 
-        Assert.Equal(["high", "low", "nan"], ranked.Select(r => r.Id));
+        Assert.Equal(["VLC", "Visual Studio"], Ids(ranked));
     }
 
     [Fact]
-    public void A_new_list_highlights_its_first_row()
+    public void History_cannot_lift_a_poor_match_over_a_good_one()
     {
-        var list = new ResultList();
-        Assert.Equal(-1, list.SelectedIndex);
-        Assert.Null(list.Selected);
+        // At most twice the relevance, so 0.3 can never beat 0.7.
+        var ranked = Ranker.Rank(
+            [Fakes.Row("good", 0.7), Fakes.Row("poor", 0.3)],
+            limit: 2,
+            history: r => r.Result.Id == "poor" ? 1.0 : 0);
 
-        list.Replace([Fakes.Result("a"), Fakes.Result("b")]);
-        Assert.Equal(0, list.SelectedIndex);
-        Assert.Equal("a", list.Selected!.Id);
+        Assert.Equal(["good", "poor"], Ids(ranked));
     }
 
-    [Fact]
-    public void Movement_clamps_at_both_ends()
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(-5.0)]
+    [InlineData(99.0)]
+    public void A_history_lift_outside_its_range_is_clamped(double lift)
     {
-        var list = new ResultList();
-        list.Replace([Fakes.Result("a"), Fakes.Result("b"), Fakes.Result("c")]);
-
-        list.MoveUp();
-        Assert.Equal(0, list.SelectedIndex);
-
-        list.MoveDown();
-        list.MoveDown();
-        list.MoveDown();
-        Assert.Equal(2, list.SelectedIndex);
-
-        list.Select(-5);
-        Assert.Equal(0, list.SelectedIndex);
+        var ranked = Ranker.Rank([Fakes.Row("a", 0.4), Fakes.Row("b", 0.9)], limit: 2, history: _ => lift);
+        Assert.Equal("b", ranked[0].Result.Id);
     }
 
-    [Fact]
-    public void An_empty_list_has_nothing_to_move()
+    [Theory]
+    [InlineData(0.0, true)]
+    [InlineData(0.02, true)]
+    [InlineData(0.021, false)]
+    [InlineData(0.5, false)]
+    public void A_last_resort_is_a_relevance_at_or_below_the_floor(double relevance, bool lastResort)
     {
-        var list = new ResultList();
-        list.MoveDown();
-        list.Select(3);
-        Assert.Equal(-1, list.SelectedIndex);
-
-        list.Replace([Fakes.Result("a")]);
-        list.Clear();
-        Assert.Equal(-1, list.SelectedIndex);
+        Assert.Equal(lastResort, Ranker.IsLastResort(Fakes.Result("x", relevance)));
     }
 }

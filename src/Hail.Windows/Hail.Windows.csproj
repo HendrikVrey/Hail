@@ -2,9 +2,10 @@
 
   <!--
     Every P/Invoke and COM call in Hail: the hotkey, the AppsFolder, icons, the backdrop, the
-    tray icon, the monitor under the cursor, and the one place a process is started. Keeping
-    all of it here is what makes the interop reviewable by reading one project, and
-    ArchitectureTests holds every other project to that.
+    tray icon, the monitor under the cursor, the session commands, the Run key, the Windows
+    Search index over OLE DB, and the one place a process is started. Keeping all of it here
+    is what makes the interop reviewable by reading one project, and ArchitectureTests holds
+    every other project to that.
 
     No WPF: this project hands the UI plain data (pixels, rectangles, error codes), so the
     choice of UI framework stays in Hail.App.
@@ -18,6 +19,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Hail.Core\Hail.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Data.OleDb" />
   </ItemGroup>
 
   <ItemGroup>

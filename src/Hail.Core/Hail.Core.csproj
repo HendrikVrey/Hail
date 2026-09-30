@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Pure: matching, ranking, the result list, and the ports first-party providers talk to the
-    host through. No I/O, no interop, no process, no UI, and no PackageReference, which
+    Pure: the supervisor, keyword parsing, matching, ranking, history, the result list, the
+    Windows Search SQL, and the ports first-party providers talk to the host through. No I/O, no interop, no process, no UI, and no PackageReference, which
     ArchitectureTests holds it to. That is what lets the code that decides what the user sees
     be tested exhaustively without a window.
   -->

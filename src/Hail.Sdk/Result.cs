@@ -9,7 +9,9 @@ namespace Hail.Sdk;
 /// <param name="Subtitle">A muted second line, or null.</param>
 /// <param name="Icon">Data describing the icon, never an image object.</param>
 /// <param name="Relevance">
-/// The provider's own judgement, 0 to 1. The host clamps anything outside that range.
+/// The provider's own judgement, 0 to 1. The host clamps anything outside that range. A row
+/// at <see cref="LastResort"/> or below is a last resort (<em>Search the web for...</em>): the
+/// host shows it only once every provider has answered, and below everything else.
 /// </param>
 /// <param name="Primary">What Enter does.</param>
 /// <param name="Secondary">Other actions, each on its own chord.</param>
@@ -22,7 +24,17 @@ public sealed record Result(
     double Relevance,
     ResultAction Primary,
     IReadOnlyList<ResultAction> Secondary,
-    MatchSpans? Highlight);
+    MatchSpans? Highlight)
+{
+    /// <summary>The relevance at or below which a row is a last resort (see <see cref="Relevance"/>).</summary>
+    public const double LastResort = 0.02;
+
+    /// <summary>
+    /// What Tab puts in the box when this row is highlighted: the next folder of a path, a
+    /// calculator's answer. Null when Tab has nothing to complete here.
+    /// </summary>
+    public string? Completion { get; init; }
+}
 
 /// <summary>Something a result can do.</summary>
 /// <param name="Title">"Open", "Run as administrator", "Copy result".</param>
@@ -48,6 +60,7 @@ public enum Gesture
     ShiftEnter,
     CtrlShiftEnter,
     CtrlC,
+    CtrlShiftC,
 }
 
 /// <summary>What the box does after an action has run.</summary>
@@ -64,11 +77,29 @@ public abstract record ActionOutcome
     public static ActionOutcome KeepOpen { get; } = new KeepBoxOpen();
 
     /// <summary>The box stays and its text becomes <paramref name="text"/>.</summary>
-    public static ActionOutcome ReplaceQuery(string text) => new ReplaceQueryText(text);
+    public static ActionOutcome ReplaceQuery(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        return new ReplaceQueryText(text);
+    }
+
+    /// <summary>
+    /// Nothing has happened yet: the box asks <paramref name="question"/> and runs
+    /// <paramref name="confirmed"/> only if the user presses Enter on it. Escape, or typing,
+    /// goes back. For anything that cannot be taken back (restarting Windows, say).
+    /// </summary>
+    public static ActionOutcome AskFirst(string question, ResultAction confirmed)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(question);
+        ArgumentNullException.ThrowIfNull(confirmed);
+        return new Confirm(question, confirmed);
+    }
 
     public sealed record HideBox : ActionOutcome;
 
     public sealed record KeepBoxOpen : ActionOutcome;
 
     public sealed record ReplaceQueryText(string Text) : ActionOutcome;
+
+    public sealed record Confirm(string Question, ResultAction Confirmed) : ActionOutcome;
 }

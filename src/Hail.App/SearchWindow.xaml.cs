@@ -21,13 +21,16 @@ internal sealed partial class SearchWindow : Window
 {
     private readonly SearchViewModel _model;
     private readonly IHostLog _log;
+    private readonly bool _keepLastQuery;
     private nint _handle;
     private bool _quitting;
+    private bool _resetting;
 
-    public SearchWindow(SearchViewModel model, IHostLog log)
+    public SearchWindow(SearchViewModel model, IHostLog log, bool keepLastQuery)
     {
         _model = model;
         _log = log;
+        _keepLastQuery = keepLastQuery;
         DataContext = model;
         InitializeComponent();
 
@@ -35,6 +38,9 @@ internal sealed partial class SearchWindow : Window
         Deactivated += (_, _) => Dismiss();
         PreviewKeyDown += OnPreviewKeyDown;
     }
+
+    /// <summary>Ctrl+, was pressed: the host opens Hail's settings.</summary>
+    public event Action? SettingsRequested;
 
     public bool IsSummoned => IsVisible;
 
@@ -52,7 +58,10 @@ internal sealed partial class SearchWindow : Window
         ShowActivated = true;
     }
 
-    /// <summary>Shows the box on the monitor under the mouse, focused and empty.</summary>
+    /// <summary>
+    /// Shows the box on the monitor under the mouse, focused. An empty box fills with the
+    /// results picked most; a kept query is searched again and selected, so typing replaces it.
+    /// </summary>
     public void Summon()
     {
         var monitor = Screens.UnderCursor();
@@ -73,9 +82,12 @@ internal sealed partial class SearchWindow : Window
         PlaceOn(monitor, Screens.WindowBounds(_handle).Width);
         SearchBox.Focus();
         Keyboard.Focus(SearchBox);
+        SearchBox.SelectAll();
+
+        _ = SearchAsync(SearchBox.Text);
     }
 
-    /// <summary>Hides the box and clears it for next time (Hail.md §10.3, Escape).</summary>
+    /// <summary>Hides the box, clearing it for next time unless the setting keeps it (Hail.md §10.3).</summary>
     public void Dismiss()
     {
         if (!IsVisible)
@@ -84,7 +96,23 @@ internal sealed partial class SearchWindow : Window
         }
 
         Hide();
-        SearchBox.Text = string.Empty;
+        if (_keepLastQuery)
+        {
+            return;
+        }
+
+        // Emptying the field would search for the empty box; the summon does that when it is wanted.
+        _resetting = true;
+        try
+        {
+            SearchBox.Text = string.Empty;
+        }
+        finally
+        {
+            _resetting = false;
+        }
+
+        Placeholder.Visibility = Visibility.Visible;
         _model.Reset();
     }
 
@@ -153,24 +181,35 @@ internal sealed partial class SearchWindow : Window
         Screens.MoveTo(_handle, x, y);
     }
 
-    private async void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         Placeholder.Visibility = SearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Hidden;
+        if (!_resetting)
+        {
+            _ = SearchAsync(SearchBox.Text);
+        }
+    }
+
+    private async Task SearchAsync(string text)
+    {
         try
         {
-            await _model.SearchAsync(SearchBox.Text).ConfigureAwait(true);
+            await _model.SearchAsync(text).ConfigureAwait(true);
         }
-#pragma warning disable CA1031 // An event handler is the end of the line; the failure is logged and the box lives.
+#pragma warning disable CA1031 // The end of the line for a keystroke; the failure is logged and the box lives.
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            _log.LogError($"A query of {SearchBox.Text.Length} characters failed.", ex);
+            _log.LogError($"A query of {text.Length} characters failed.", ex);
         }
     }
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        var ctrl = Keyboard.Modifiers == ModifierKeys.Control;
+        var modifiers = Keyboard.Modifiers;
+        var ctrl = modifiers == ModifierKeys.Control;
+        var ctrlShift = modifiers == (ModifierKeys.Control | ModifierKeys.Shift);
+
         switch (e.Key)
         {
             case Key.Down:
@@ -178,35 +217,92 @@ internal sealed partial class SearchWindow : Window
                 _model.MoveDown();
                 e.Handled = true;
                 break;
+
             case Key.Up:
             case Key.K when ctrl:
                 _model.MoveUp();
                 e.Handled = true;
                 break;
-            case Key.Enter when Keyboard.Modifiers == ModifierKeys.None:
+
+            case Key.Enter:
                 e.Handled = true;
-                _ = ExecuteAsync();
+                if (EnterGesture(modifiers) is { } gesture)
+                {
+                    _ = ExecuteAsync(gesture);
+                }
+
                 break;
-            case Key.Escape:
+
+            // Ctrl+C copies the box's own selected text, as in any text field; only with
+            // nothing selected there does it go to the highlighted row.
+            case Key.C when ctrl && SearchBox.SelectionLength == 0 && _model.Offers(Gesture.CtrlC):
+                e.Handled = true;
+                _ = ExecuteAsync(Gesture.CtrlC);
+                break;
+
+            case Key.C when ctrlShift && _model.Offers(Gesture.CtrlShiftC):
+                e.Handled = true;
+                _ = ExecuteAsync(Gesture.CtrlShiftC);
+                break;
+
+            // Tab completes; it never moves the focus out of the field.
+            case Key.Tab:
+                e.Handled = true;
+                Complete();
+                break;
+
+            case Key.OemComma when ctrl:
                 e.Handled = true;
                 Dismiss();
+                SettingsRequested?.Invoke();
+                break;
+
+            case Key.Escape:
+                e.Handled = true;
+                if (!_model.CancelConfirmation())
+                {
+                    Dismiss();
+                }
+
                 break;
         }
     }
 
-    private async Task ExecuteAsync()
+    private static Gesture? EnterGesture(ModifierKeys modifiers) => modifiers switch
+    {
+        ModifierKeys.None => Gesture.Enter,
+        ModifierKeys.Control => Gesture.CtrlEnter,
+        ModifierKeys.Shift => Gesture.ShiftEnter,
+        ModifierKeys.Control | ModifierKeys.Shift => Gesture.CtrlShiftEnter,
+        _ => null,
+    };
+
+    private void Complete()
+    {
+        if (_model.Completion is { } completion)
+        {
+            SetText(completion);
+        }
+    }
+
+    private void SetText(string text)
+    {
+        SearchBox.Text = text;
+        SearchBox.CaretIndex = SearchBox.Text.Length;
+    }
+
+    private async Task ExecuteAsync(Gesture gesture)
     {
         try
         {
-            var outcome = await _model.ExecuteSelectedAsync().ConfigureAwait(true);
+            var outcome = await _model.ExecuteAsync(gesture).ConfigureAwait(true);
             switch (outcome)
             {
                 case ActionOutcome.HideBox:
                     Dismiss();
                     break;
                 case ActionOutcome.ReplaceQueryText replace:
-                    SearchBox.Text = replace.Text;
-                    SearchBox.CaretIndex = SearchBox.Text.Length;
+                    SetText(replace.Text);
                     break;
             }
         }
@@ -233,7 +329,7 @@ internal sealed partial class SearchWindow : Window
         if (sender is FrameworkElement { DataContext: ResultRow row })
         {
             _model.Select(row);
-            _ = ExecuteAsync();
+            _ = ExecuteAsync(Gesture.Enter);
         }
     }
 }

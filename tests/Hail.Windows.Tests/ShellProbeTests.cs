@@ -1,6 +1,8 @@
 using Hail.Core.Ports;
+using Hail.Sdk;
 using Hail.Windows.Apps;
 using Hail.Windows.Icons;
+using Hail.Windows.Launching;
 
 namespace Hail.Windows.Tests;
 
@@ -80,10 +82,49 @@ public sealed class ShellProbeTests : IDisposable
     {
         var catalog = new ShellAppCatalog(_worker);
         await catalog.RefreshAsync(Token);
-        var launcher = new ShellAppLauncher(catalog);
+        var launcher = new ShellLauncher(catalog, _worker);
 
         await Assert.ThrowsAsync<LaunchRefusedException>(() => launcher.LaunchAppAsync(@"C:\Windows\System32\cmd.exe", Token).AsTask());
         await Assert.ThrowsAsync<LaunchRefusedException>(() => launcher.LaunchAppAsync("", Token).AsTask());
+        await Assert.ThrowsAsync<LaunchRefusedException>(() => launcher.LaunchAppAsAdministratorAsync(@"C:\Windows\System32\cmd.exe", Token).AsTask());
+    }
+
+    [Fact]
+    public async Task The_launcher_will_not_elevate_a_packaged_app()
+    {
+        var catalog = new ShellAppCatalog(_worker);
+        await catalog.RefreshAsync(Token);
+        var packaged = catalog.Apps.First(a => ShellAppCatalog.IsPackaged(a.Id));
+
+        var refused = await Assert.ThrowsAsync<LaunchRefusedException>(
+            () => new ShellLauncher(catalog, _worker).LaunchAppAsAdministratorAsync(packaged.Id, Token).AsTask());
+        Assert.Contains("administrator", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("file:///C:/Windows/System32/calc.exe")]
+    [InlineData("ms-settings:display")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("ftp://example.com/")]
+    public async Task The_launcher_opens_only_web_addresses(string address)
+    {
+        var launcher = new ShellLauncher(new ShellAppCatalog(_worker), _worker);
+
+        await Assert.ThrowsAsync<LaunchRefusedException>(() => launcher.OpenUriAsync(new Uri(address), Token).AsTask());
+    }
+
+    [Theory]
+    [InlineData(@"\\evil.example\share\payload.exe")]
+    [InlineData(@"\\?\C:\Windows\notepad.exe")]
+    [InlineData(@"relative\file.txt")]
+    [InlineData(@"C:\Windows\win.ini:stream")]
+    [InlineData(@"C:\No such folder\no such file.txt")]
+    public async Task The_launcher_opens_only_local_paths_that_are_there(string path)
+    {
+        var launcher = new ShellLauncher(new ShellAppCatalog(_worker), _worker);
+
+        await Assert.ThrowsAsync<LaunchRefusedException>(() => launcher.OpenPathAsync(path, Token).AsTask());
+        await Assert.ThrowsAsync<LaunchRefusedException>(() => launcher.ShowInFolderAsync(path, Token).AsTask());
     }
 
     [Fact]

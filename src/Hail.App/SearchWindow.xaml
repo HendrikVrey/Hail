@@ -43,6 +43,7 @@
       <Grid Height="56" Margin="8,0">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -54,14 +55,28 @@
           Margin="2,2,14,0"
           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
-        <Grid Grid.Column="1">
+        <!-- The keyword in force: "g" shows Google, so the user sees the scope they are in. -->
+        <Border
+          x:Name="ScopeChip"
+          Grid.Column="1"
+          Style="{StaticResource ScopeChipStyle}"
+          Visibility="{Binding HasScope, Converter={StaticResource Visible}}">
+          <TextBlock
+            Text="{Binding Scope}"
+            FontSize="13"
+            FontWeight="SemiBold"
+            Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+        </Border>
+
+        <Grid Grid.Column="2">
           <TextBlock
             x:Name="Placeholder"
-            Text="Search apps"
+            Text="Search apps, files and the web, or type a sum"
             FontFamily="{StaticResource BoxDisplayFont}"
             FontSize="22"
             Margin="2,0,0,0"
             VerticalAlignment="Center"
+            TextTrimming="CharacterEllipsis"
             IsHitTestVisible="False"
             Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
           <TextBox
@@ -111,12 +126,21 @@
                   Background="{DynamicResource AccentFillColorDefaultBrush}"
                   Visibility="Hidden" />
 
-                <Image
-                  Width="32"
-                  Height="32"
-                  Margin="12,0,12,0"
-                  Source="{Binding Icon}"
-                  RenderOptions.BitmapScalingMode="HighQuality" />
+                <Grid Width="32" Height="32" Margin="12,0,12,0">
+                  <Image
+                    x:Name="IconImage"
+                    Source="{Binding Icon}"
+                    RenderOptions.BitmapScalingMode="HighQuality" />
+                  <TextBlock
+                    x:Name="IconGlyph"
+                    Text="{Binding Glyph}"
+                    FontFamily="{StaticResource IconFont}"
+                    FontSize="22"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Visibility="Collapsed"
+                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </Grid>
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                   <TextBlock
@@ -160,6 +184,15 @@
                 <Setter TargetName="Pill" Property="Visibility" Value="Visible" />
                 <Setter TargetName="Hint" Property="Visibility" Value="Visible" />
               </DataTrigger>
+              <DataTrigger Binding="{Binding HasGlyph}" Value="True">
+                <Setter TargetName="IconImage" Property="Visibility" Value="Collapsed" />
+                <Setter TargetName="IconGlyph" Property="Visibility" Value="Visible" />
+              </DataTrigger>
+              <DataTrigger Binding="{Binding IconMissing}" Value="True">
+                <Setter TargetName="IconImage" Property="Visibility" Value="Collapsed" />
+                <Setter TargetName="IconGlyph" Property="Visibility" Value="Visible" />
+                <Setter TargetName="IconGlyph" Property="Text" Value="&#xE8A5;" />
+              </DataTrigger>
             </DataTemplate.Triggers>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
@@ -172,6 +205,38 @@
         TextWrapping="Wrap"
         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
         Visibility="{Binding HasStatus, Converter={StaticResource Visible}}" />
+
+      <!-- The highlighted row's other actions, each with its chord: the keymap made findable. -->
+      <ItemsControl
+        x:Name="Footer"
+        Margin="12,6,12,0"
+        ItemsSource="{Binding Footer}"
+        Focusable="False"
+        Visibility="{Binding HasFooter, Converter={StaticResource Visible}}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel Orientation="Horizontal" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="{x:Type local:ActionHint}">
+            <StackPanel Orientation="Horizontal" Margin="0,2,18,2">
+              <Border Style="{StaticResource KeycapStyle}">
+                <TextBlock
+                  Text="{Binding Chord}"
+                  FontSize="11"
+                  Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              </Border>
+              <TextBlock
+                Text="{Binding Title}"
+                FontSize="12"
+                Margin="6,0,0,0"
+                VerticalAlignment="Center"
+                Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
 
     </StackPanel>
   </Border>

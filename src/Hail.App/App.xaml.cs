@@ -45,7 +45,7 @@ public partial class App : Application
 
         ApplicationThemeManager.ApplySystemTheme();
 
-        _host = new HailHost(claim, _log);
+        _host = new HailHost(claim, _log, HailPaths.Default);
         _host.Start();
     }
 

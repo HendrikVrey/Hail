@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Everything Hail writes to disk. In M0 that is only the log; settings, history and plugin
-    enablement arrive in M1 and M2. Nothing here is load-bearing (Hail.md §1: Hail owns no
-    index), so deleting %LOCALAPPDATA%\Hail loses a log and, later, which results you favour.
+    Everything Hail writes to disk: the log, settings.json and usage.json (history); plugin
+    enablement arrives in M2. Nothing here is load-bearing (Hail.md §1: Hail owns no index),
+    so deleting %LOCALAPPDATA%\Hail loses a log, your settings and which results you favour.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

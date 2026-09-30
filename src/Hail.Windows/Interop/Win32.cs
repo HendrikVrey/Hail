@@ -204,6 +204,88 @@ internal static partial class Kernel32
 {
     [LibraryImport("kernel32.dll", EntryPoint = "GetModuleHandleW", SetLastError = true)]
     public static partial nint GetModuleHandle(nint moduleName);
+
+    [LibraryImport("kernel32.dll")]
+    public static partial nint GetCurrentProcess();
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool CloseHandle(nint handle);
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct LUID
+{
+    public uint LowPart;
+    public int HighPart;
+}
+
+/// <summary>TOKEN_PRIVILEGES with room for exactly one privilege, which is all Hail asks for.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct TOKEN_PRIVILEGES
+{
+    public uint PrivilegeCount;
+    public LUID Luid;
+    public uint Attributes;
+}
+
+internal static partial class Advapi32
+{
+    public const uint TOKEN_ADJUST_PRIVILEGES = 0x0020;
+    public const uint TOKEN_QUERY = 0x0008;
+    public const uint SE_PRIVILEGE_ENABLED = 0x00000002;
+    public const string SE_SHUTDOWN_NAME = "SeShutdownPrivilege";
+    public const int ERROR_NOT_ALL_ASSIGNED = 1300;
+
+    [LibraryImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool OpenProcessToken(nint process, uint access, out nint token);
+
+    [LibraryImport("advapi32.dll", EntryPoint = "LookupPrivilegeValueW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool LookupPrivilegeValue(string? systemName, string name, out LUID luid);
+
+    [LibraryImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool AdjustTokenPrivileges(nint token, [MarshalAs(UnmanagedType.Bool)] bool disableAll, ref TOKEN_PRIVILEGES newState, uint bufferLength, nint previousState, nint returnLength);
+}
+
+internal static partial class Session32
+{
+    public const uint EWX_LOGOFF = 0x00000000;
+    public const uint EWX_REBOOT = 0x00000002;
+    public const uint EWX_POWEROFF = 0x00000008;
+
+    // SHTDN_REASON_MAJOR_OTHER | SHTDN_REASON_MINOR_OTHER | SHTDN_REASON_FLAG_PLANNED: the user
+    // asked for it, which is what the event log should say.
+    public const uint ReasonPlannedOther = 0x80000000;
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool LockWorkStation();
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool ExitWindowsEx(uint flags, uint reason);
+
+    [LibraryImport("powrprof.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    public static partial bool SetSuspendState(
+        [MarshalAs(UnmanagedType.U1)] bool hibernate,
+        [MarshalAs(UnmanagedType.U1)] bool force,
+        [MarshalAs(UnmanagedType.U1)] bool wakeupEventsDisabled);
+}
+
+internal static partial class ShellFolders
+{
+    [LibraryImport("shell32.dll", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial int SHParseDisplayName(string name, nint bindContext, out nint itemList, uint attributesIn, out uint attributesOut);
+
+    [LibraryImport("shell32.dll")]
+    public static partial int SHOpenFolderAndSelectItems(nint folder, uint count, nint items, uint flags);
+
+    [LibraryImport("shell32.dll")]
+    public static partial void ILFree(nint itemList);
 }
 
 internal static partial class ShCore

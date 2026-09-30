@@ -18,7 +18,7 @@
     <Description>The plugin contract for Hail, a keyboard launcher for Windows.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <!-- 0.x until M2: the contract is still allowed to change shape. -->
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
   </PropertyGroup>
 
 </Project>

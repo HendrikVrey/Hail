@@ -14,6 +14,9 @@ public sealed record AppEntry(string Id, string Name)
 {
     /// <summary>The parsing name that reaches this app through the shell.</summary>
     public string ShellPath => AppsFolder.PathFor(Id);
+
+    /// <summary>Whether this is a packaged (MSIX or Store) app.</summary>
+    public bool IsPackaged => AppsFolder.IsPackagedId(Id);
 }
 
 /// <summary>The apps the Start menu lists, as the host last read them.</summary>
@@ -36,5 +39,15 @@ public static class AppsFolder
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         return Prefix + id;
+    }
+
+    /// <summary>
+    /// A packaged app's id is its AppUserModelID, which is always a package family name and an
+    /// application id joined by '!'. A desktop app's never contains one.
+    /// </summary>
+    public static bool IsPackagedId(string id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        return id.Contains('!', StringComparison.Ordinal);
     }
 }

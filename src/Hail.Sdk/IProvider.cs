@@ -20,3 +20,29 @@ public interface IProvider
     /// </summary>
     IAsyncEnumerable<Result> QueryAsync(Query query, CancellationToken ct);
 }
+
+/// <summary>
+/// A provider whose results are worth remembering: an app, a file. The host records which of
+/// them the user picks and for what they had typed, ranks those higher next time, and shows
+/// the usual ones in an empty box by asking the provider to rebuild them from their ids.
+/// </summary>
+/// <remarks>
+/// A provider that does not implement this has nothing it picks remembered at all. That is
+/// deliberate for anything whose result id carries what the user typed (a web search, a sum):
+/// history is written to disk, and what was typed must not be.
+/// </remarks>
+public interface IRecall
+{
+    /// <summary>
+    /// False while the provider cannot yet tell what exists (before it has read its catalog
+    /// for the first time, say). The host then asks for nothing, and forgets nothing.
+    /// </summary>
+    bool CanRecall { get; }
+
+    /// <summary>
+    /// The result <paramref name="id"/> names, as a query would produce it now; null when it
+    /// no longer exists (an app uninstalled, a file deleted), and the host then forgets it.
+    /// Called with an empty <see cref="Query"/>; keep it quick.
+    /// </summary>
+    ValueTask<Result?> RecallAsync(string id, CancellationToken ct);
+}

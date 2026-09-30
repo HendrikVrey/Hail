@@ -98,7 +98,7 @@ public sealed partial class ArchitectureTests
     [Fact]
     public void Only_the_launcher_starts_a_process()
     {
-        var launcher = Path.Combine("src", "Hail.Windows", "Apps", "ShellAppLauncher.cs");
+        var launcher = Path.Combine("src", "Hail.Windows", "Launching", "ShellLauncher.cs");
         var offenders = SourceFiles(Path.Combine(RepoRoot, "src"))
             .Where(f => !f.EndsWith(launcher, StringComparison.OrdinalIgnoreCase))
             .Where(f => ProcessStart().IsMatch(CodeOnly(File.ReadAllText(f))))
@@ -120,7 +120,44 @@ public sealed partial class ArchitectureTests
             "Hail.App draws and wires; starting, loading and querying belong to the layers below it.");
     }
 
+    [Fact]
+    public void Only_the_search_index_speaks_oledb_and_only_with_sql_from_the_escaping_function()
+    {
+        var index = Path.Combine("src", "Hail.Windows", "Files", "WindowsSearchIndex.cs");
+        var offenders = SourceFiles(Path.Combine(RepoRoot, "src"))
+            .Where(f => !f.EndsWith(index, StringComparison.OrdinalIgnoreCase))
+            .Where(f => OleDb().IsMatch(CodeOnly(File.ReadAllText(f))))
+            .Select(f => Path.GetRelativePath(RepoRoot, f))
+            .ToArray();
+
+        Assert.True(
+            offenders.Length == 0,
+            $"Only {index} may reach the index (Hail.md §7.2). Offending files: {string.Join("; ", offenders)}");
+
+        // The one command it builds is built from WindowsSearchSql's text and nothing else.
+        var source = CodeOnly(File.ReadAllText(Path.Combine(RepoRoot, index)));
+        Assert.Single(Regex.Matches(source, @"new OleDbCommand\("));
+        Assert.Contains("new OleDbCommand(sql, connection)", source, StringComparison.Ordinal);
+        Assert.Matches(@"var sql = WindowsSearchSql\.FileNameQuery\(", source);
+    }
+
+    [Fact]
+    public void Only_start_at_sign_in_touches_the_registry()
+    {
+        var startup = Path.Combine("src", "Hail.Windows", "Startup", "StartupRegistration.cs");
+        var offenders = SourceFiles(Path.Combine(RepoRoot, "src"))
+            .Where(f => !f.EndsWith(startup, StringComparison.OrdinalIgnoreCase))
+            .Where(f => Regex.IsMatch(CodeOnly(File.ReadAllText(f)), @"\bRegistry(Key)?\b"))
+            .Select(f => Path.GetRelativePath(RepoRoot, f))
+            .ToArray();
+
+        Assert.True(offenders.Length == 0, $"Only {startup} writes to the registry. Offending files: {string.Join("; ", offenders)}");
+    }
+
     public static TheoryData<string> NonInterop() => new(NonInteropProjects);
+
+    [GeneratedRegex(@"\bOleDb\w*\b")]
+    private static partial Regex OleDb();
 
     [GeneratedRegex(@"\bSystem\.Windows\b|\bWpf\.Ui\b|\bImageSource\b|\bBitmapSource\b")]
     private static partial Regex UiTypes();

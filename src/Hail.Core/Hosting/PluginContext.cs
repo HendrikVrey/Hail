@@ -4,11 +4,13 @@ using Hail.Sdk;
 namespace Hail.Core.Hosting;
 
 /// <summary>What the host hands one provider.</summary>
-public sealed class PluginContext(string pluginId, ILauncher launcher, IMatcher matcher, IHostLog log) : IPluginContext
+public sealed class PluginContext(string pluginId, ILauncher launcher, IMatcher matcher, IClipboard clipboard, IHostLog log) : IPluginContext
 {
     public ILauncher Launcher { get; } = launcher;
 
     public IMatcher Matcher { get; } = matcher;
+
+    public IClipboard Clipboard { get; } = clipboard;
 
     public IPluginLog Log { get; } = new PluginLog(pluginId, log);
 }

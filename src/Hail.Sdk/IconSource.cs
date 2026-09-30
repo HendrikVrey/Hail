@@ -23,7 +23,20 @@ public abstract record IconSource
         return new ShellItem(parsingName);
     }
 
+    /// <summary>
+    /// A glyph from the system's icon font (Segoe Fluent Icons on Windows 11, Segoe MDL2 Assets
+    /// before it), given as the character that draws it, such as <c>"\uE8EF"</c> for a
+    /// calculator. The host draws it in the row's text colour, so it follows light and dark.
+    /// </summary>
+    public static IconSource ForGlyph(string glyph)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(glyph);
+        return new Glyph(glyph);
+    }
+
     public sealed record NoIcon : IconSource;
 
     public sealed record ShellItem(string ParsingName) : IconSource;
+
+    public sealed record Glyph(string Character) : IconSource;
 }
