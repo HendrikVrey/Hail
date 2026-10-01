@@ -48,7 +48,7 @@ public sealed class TrayIcon : IDisposable
     private const nint ApplicationIconResource = 32512;
 
     private readonly nint _window;
-    private readonly string _tip;
+    private string _tip;
     private nint _icon;
     private bool _added;
 
@@ -78,6 +78,16 @@ public sealed class TrayIcon : IDisposable
     {
         _added = false;
         Add();
+    }
+
+    /// <summary>Changes the text shown when the pointer rests on the icon (it names the shortcut).</summary>
+    public unsafe void SetTip(string tip)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tip);
+        _tip = tip;
+        var data = NewData(Shell32.NIF_TIP | Shell32.NIF_SHOWTIP);
+        Copy(_tip, data.Tip, 128);
+        Shell32.Shell_NotifyIcon(Shell32.NIM_MODIFY, ref data);
     }
 
     /// <summary>

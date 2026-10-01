@@ -8,8 +8,9 @@ SUMMARY, WHICH IS NOT THE LICENCE
 
 Hail is free to download, read and use, for anything, including at work. It is
 not open source: you may not change it, republish it, or sell it. The plugin
-contract in src/Hail.Sdk, the plugin template in templates/hail-plugin and the
-plugin guide in docs/plugins.md are the exception, and are MIT licensed so that
+contract in src/Hail.Sdk, the plugin template in templates/hail-plugin, the
+plugin guide in docs/plugins.md and the Everything plugin in
+plugins/Hail.Plugin.Everything are the exception, and are MIT licensed so that
 anyone can build and publish plugins. The terms below are what actually apply.
 
 
@@ -20,9 +21,9 @@ it, its assets, and its documentation, as published by the copyright holder,
 except for the SDK.
 
 "The SDK" means everything in the folder src/Hail.Sdk and the Hail.Sdk
-package built from it, everything in the folder templates/hail-plugin, and the
-file docs/plugins.md: what a plugin author compiles against, starts from, and
-copies examples out of.
+package built from it, everything in the folders templates/hail-plugin and
+plugins/Hail.Plugin.Everything, and the file docs/plugins.md: what a plugin
+author compiles against, starts from, and copies examples out of.
 
 "You" means the individual or organisation exercising the permissions below.
 

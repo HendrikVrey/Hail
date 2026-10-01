@@ -1,0 +1,47 @@
+name: build
+
+# Builds and tests every push to master and every pull request. The release workflow gates its
+# own publish on the same suite, but by then the code is already on master; catching it on the
+# pull request is the difference between "no new build" and "no new build, and master is broken".
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # One run per ref. A new push cancels the previous run rather than queueing behind it.
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Windows: Hail is WPF, its tests drive a real WPF dispatcher and the shell, and the
+    # plugin tests load assemblies into collectible contexts as Hail does.
+    runs-on: windows-latest
+    # A hung window test would otherwise hold the runner for six hours.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Hail.slnx
+
+      # Separate steps, so a failed build is reported as one and not as a test error.
+      - name: Build
+        run: dotnet build Hail.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test Hail.slnx --configuration Release --no-build --verbosity normal

@@ -12,6 +12,9 @@ public sealed class HailPaths(string root)
 
     public string Settings => Path.Combine(Root, "settings.json");
 
+    /// <summary>When GitHub was last asked for a new version, and which one the user skipped (Hail.md §9).</summary>
+    public string UpdateState => Path.Combine(Root, "update.json");
+
     /// <summary>History: which results were picked, for what (Hail.md §6.6).</summary>
     public string Usage => Path.Combine(Root, "usage.json");
 

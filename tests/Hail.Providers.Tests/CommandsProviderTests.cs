@@ -70,10 +70,11 @@ public sealed class CommandsProviderTests
     }
 
     [Fact]
-    public async Task Settings_opens_the_settings_file()
+    public async Task Settings_asks_the_host_for_the_settings_window()
     {
         await Run((await OneAsync("hail settings")).Primary);
-        Assert.Equal([$"open {_host.SettingsPath}"], _launcher.Calls);
+        Assert.Equal(1, _host.SettingsOpened);
+        Assert.Empty(_launcher.Calls);
     }
 
     [Fact]
@@ -128,12 +129,14 @@ public sealed class CommandsProviderTests
 
         public int Reloads { get; private set; }
 
-        public string SettingsPath => @"C:\Users\Test\AppData\Local\Hail\settings.json";
+        public int SettingsOpened { get; private set; }
 
         public string PluginsFolder => @"C:\Users\Test\AppData\Local\Hail\plugins";
 
         public void Quit() => Quits++;
 
         public void ReloadPlugins() => Reloads++;
+
+        public void OpenSettings() => SettingsOpened++;
     }
 }

@@ -84,10 +84,11 @@ public sealed class CommandsProvider(ISessionControl session, IHostCommands host
             Run(session.Restart), "Restart Windows? Apps with unsaved work may lose it."),
         new("shutdown", "Shut down", "Turn this PC off; open apps close", "\uE7E8", ["shutdown", "power off", "turn off"],
             Run(session.ShutDown), "Shut down this PC? Apps with unsaved work may lose it."),
-        new("hail.settings", "Hail settings", "Open Hail's settings file; restart Hail to apply changes", "\uE713", ["hail options", "preferences"],
-            async ct =>
+        new("hail.settings", "Hail settings", "The shortcut, providers, web engines, plugins and updates", "\uE713", ["hail options", "preferences"],
+            _ =>
             {
-                await context.Launcher.OpenPathAsync(host.SettingsPath, ct).ConfigureAwait(false);
+                host.OpenSettings();
+                return ValueTask.CompletedTask;
             },
             Question: null),
         new("hail.plugins", "Open plugins folder", "Where Hail's plugins are installed, one folder each", "\uE838", ["plugins folder", "hail plugins"],

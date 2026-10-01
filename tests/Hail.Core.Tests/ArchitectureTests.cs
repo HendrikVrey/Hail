@@ -15,7 +15,7 @@ public sealed partial class ArchitectureTests
 {
     private static readonly string RepoRoot = FindRepoRoot();
 
-    private static readonly string[] NonInteropProjects = ["Hail.Sdk", "Hail.Core", "Hail.Providers", "Hail.Persistence", "Hail.Plugins", "Hail.App"];
+    private static readonly string[] NonInteropProjects = ["Hail.Sdk", "Hail.Core", "Hail.Providers", "Hail.Persistence", "Hail.Plugins", "Hail.Updates", "Hail.App"];
 
     [Fact]
     public void The_sdk_depends_on_nothing()
@@ -49,6 +49,19 @@ public sealed partial class ArchitectureTests
             "<PackageLicenseExpression>MIT</PackageLicenseExpression>",
             File.ReadAllText(ProjectFile("Hail.Sdk")),
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_everything_plugin_is_mit_and_carries_its_licence()
+    {
+        var folder = Path.Combine(RepoRoot, "plugins", "Hail.Plugin.Everything");
+
+        // Hendrik, 2026-09-30: the reference plugin is an example people copy from.
+        Assert.Equal(
+            File.ReadAllText(Path.Combine(RepoRoot, "src", "Hail.Sdk", "LICENSE")),
+            File.ReadAllText(Path.Combine(folder, "LICENSE")));
+        Assert.Contains("<None Include=\"LICENSE\" CopyToOutputDirectory", File.ReadAllText(Path.Combine(folder, "Hail.Plugin.Everything.csproj")), StringComparison.Ordinal);
+        Assert.Contains("plugins/Hail.Plugin.Everything", File.ReadAllText(Path.Combine(RepoRoot, "LICENSE")), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -96,19 +109,42 @@ public sealed partial class ArchitectureTests
     }
 
     [Fact]
-    public void Only_the_launcher_starts_a_process()
+    public void Only_the_launcher_and_the_installer_start_a_process()
     {
+        // The launcher starts what the user picked, by the host's rules; InstallerFiles starts
+        // exactly one thing, an installer Hail downloaded and has just verified again (Hail.md §9).
         var launcher = Path.Combine("src", "Hail.Windows", "Launching", "ShellLauncher.cs");
+        var installer = Path.Combine("src", "Hail.Windows", "Updates", "InstallerFiles.cs");
         var offenders = SourceFiles(Path.Combine(RepoRoot, "src"))
-            .Where(f => !f.EndsWith(launcher, StringComparison.OrdinalIgnoreCase))
+            .Where(f => !f.EndsWith(launcher, StringComparison.OrdinalIgnoreCase) && !f.EndsWith(installer, StringComparison.OrdinalIgnoreCase))
             .Where(f => ProcessStart().IsMatch(CodeOnly(File.ReadAllText(f))))
             .Select(f => Path.GetRelativePath(RepoRoot, f))
             .ToArray();
 
         Assert.True(
             offenders.Length == 0,
-            $"Only {launcher} may start a process (Hail.md §9). Offending files: {string.Join("; ", offenders)}");
+            $"Only {launcher} and {installer} may start a process (Hail.md §9). Offending files: {string.Join("; ", offenders)}");
         Assert.Matches(ProcessStart(), File.ReadAllText(Path.Combine(RepoRoot, launcher)));
+        Assert.Single(Regex.Matches(CodeOnly(File.ReadAllText(Path.Combine(RepoRoot, installer))), @"\bProcess\.Start\("));
+    }
+
+    [Fact]
+    public void Only_the_update_check_speaks_to_the_network()
+    {
+        // Hail.md §9: nothing typed leaves the machine, and the one request Hail makes itself is
+        // the opt-in update check. A plugin can do what it likes; Hail's own code cannot.
+        var updates = Path.Combine("src", "Hail.Updates");
+        var offenders = SourceFiles(Path.Combine(RepoRoot, "src"))
+            .Where(f => !Path.GetRelativePath(RepoRoot, f).StartsWith(updates + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            .Where(f => Network().IsMatch(CodeOnly(File.ReadAllText(f))))
+            .Select(f => Path.GetRelativePath(RepoRoot, f))
+            .ToArray();
+
+        Assert.True(offenders.Length == 0, $"Only {updates} may reach the network. Offending files: {string.Join("; ", offenders)}");
+        Assert.Contains(
+            "https://api.github.com/repos/HendrikVrey/Hail/releases/latest",
+            File.ReadAllText(Path.Combine(RepoRoot, updates, "UpdateClient.cs")),
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -205,6 +241,9 @@ public sealed partial class ArchitectureTests
 
     [GeneratedRegex(@"\bAssemblyLoadContext\b|\bAssembly\.(Load|LoadFrom|LoadFile|UnsafeLoadFrom)\b|\bLoadFromAssemblyPath\b|\bLoadFromStream\b|\bActivator\.CreateInstance\b")]
     private static partial Regex LoadsCode();
+
+    [GeneratedRegex(@"\bHttpClient\b|\bHttpMessageHandler\b|\bSocketsHttpHandler\b|\bWebRequest\b|\bWebClient\b|\bTcpClient\b|\bUdpClient\b|\bSockets?\.")]
+    private static partial Regex Network();
 
     [GeneratedRegex(@"\bOleDb\w*\b")]
     private static partial Regex OleDb();

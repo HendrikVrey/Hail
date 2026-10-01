@@ -36,6 +36,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The mark on the settings window's About page. -->
+    <Resource Include="..\..\assets\hail.png" Link="hail.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- For a window harness that builds the real box off screen (tooling: named after the
          test project so internals and x:Name fields are reachable without reflection). -->
     <InternalsVisibleTo Include="Hail.App.Tests" />
@@ -48,6 +53,7 @@
     <ProjectReference Include="..\Hail.Windows\Hail.Windows.csproj" />
     <ProjectReference Include="..\Hail.Persistence\Hail.Persistence.csproj" />
     <ProjectReference Include="..\Hail.Plugins\Hail.Plugins.csproj" />
+    <ProjectReference Include="..\Hail.Updates\Hail.Updates.csproj" />
   </ItemGroup>
 
 </Project>

@@ -78,10 +78,16 @@ public sealed class StartupRegistration(
         approved?.DeleteValue(valueName, throwOnMissingValue: false);
     }
 
+    /// <summary>Removes the entry, and Task Manager's flag for it, so nothing of Hail's is left there.</summary>
     public void Disable()
     {
-        using var run = Registry.CurrentUser.OpenSubKey(runKey, writable: true);
-        run?.DeleteValue(valueName, throwOnMissingValue: false);
+        using (var run = Registry.CurrentUser.OpenSubKey(runKey, writable: true))
+        {
+            run?.DeleteValue(valueName, throwOnMissingValue: false);
+        }
+
+        using var approved = Registry.CurrentUser.OpenSubKey(approvedKey, writable: true);
+        approved?.DeleteValue(valueName, throwOnMissingValue: false);
     }
 
     /// <summary>The command line Windows runs: the path quoted, since it may hold spaces.</summary>

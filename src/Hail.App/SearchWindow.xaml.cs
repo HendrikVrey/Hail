@@ -21,7 +21,7 @@ internal sealed partial class SearchWindow : Window
 {
     private readonly SearchViewModel _model;
     private readonly IHostLog _log;
-    private readonly bool _keepLastQuery;
+    private bool _keepLastQuery;
     private nint _handle;
     private bool _quitting;
     private bool _resetting;
@@ -43,6 +43,9 @@ internal sealed partial class SearchWindow : Window
     public event Action? SettingsRequested;
 
     public bool IsSummoned => IsVisible;
+
+    /// <summary>The setting changed in the settings window; it counts from the next time the box hides.</summary>
+    public void SetKeepLastQuery(bool keep) => _keepLastQuery = keep;
 
     /// <summary>
     /// Creates the window's handle and pays for its first layout and render now, off screen

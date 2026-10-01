@@ -1,0 +1,519 @@
+<ui:FluentWindow
+  x:Class="Hail.App.SettingsWindow"
+  x:ClassModifier="internal"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+  Title="Hail settings"
+  Width="880"
+  Height="700"
+  MinWidth="660"
+  MinHeight="480"
+  ExtendsContentIntoTitleBar="True"
+  WindowBackdropType="Mica"
+  WindowCornerPreference="Round"
+  WindowStartupLocation="CenterScreen"
+  FontFamily="{StaticResource BoxFont}"
+  PreviewKeyDown="Window_PreviewKeyDown">
+
+  <!--
+    Hail's settings (Hail.md §10.4), laid out as Windows' own Settings is: sections down the
+    left, cards on the right. Every switch applies at once and is saved; the web engines, which
+    are typed, are saved together with their own button once they pass their checks.
+  -->
+  <Window.Resources>
+    <Style x:Key="SectionTitle" TargetType="TextBlock">
+      <Setter Property="FontFamily" Value="{StaticResource BoxDisplayFont}" />
+      <Setter Property="FontSize" Value="28" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+    </Style>
+    <Style x:Key="Intro" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="Margin" Value="0,0,0,16" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+    </Style>
+    <Style x:Key="Card" TargetType="Border">
+      <Setter Property="Padding" Value="18,14" />
+      <Setter Property="Margin" Value="0,0,0,4" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+    </Style>
+    <Style x:Key="CardTitle" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+    </Style>
+    <Style x:Key="CardText" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Margin" Value="0,2,0,0" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+    </Style>
+    <Style x:Key="GroupLabel" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,20,0,8" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+    </Style>
+    <Style x:Key="Problem" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Margin" Value="2,6,0,4" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Visibility" Value="Collapsed" />
+      <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+    </Style>
+    <Style x:Key="Note" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Margin" Value="2,6,0,4" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Visibility" Value="Collapsed" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+    </Style>
+    <Style x:Key="NavGlyph" TargetType="TextBlock">
+      <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="Width" Value="28" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="SectionPanel" TargetType="StackPanel">
+      <Setter Property="Visibility" Value="Collapsed" />
+      <Setter Property="MaxWidth" Value="820" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <!--
+      The section list as Windows' own Settings draws it: a subtle fill and a short accent pill
+      on the selected row. WPF-UI's ListBoxItem fills the whole row with the accent, which puts
+      white text on a light accent and fails contrast in the dark theme.
+    -->
+    <Style x:Key="NavItem" TargetType="ListBoxItem">
+      <Setter Property="Margin" Value="0,1" />
+      <Setter Property="Padding" Value="12,9" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBoxItem">
+            <Grid>
+              <Border
+                x:Name="Back"
+                Padding="{TemplateBinding Padding}"
+                Background="Transparent"
+                CornerRadius="4">
+                <ContentPresenter />
+              </Border>
+              <Border
+                x:Name="Pill"
+                Width="3"
+                Height="16"
+                HorizontalAlignment="Left"
+                Background="{DynamicResource AccentFillColorDefaultBrush}"
+                CornerRadius="1.5"
+                Visibility="Collapsed" />
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Back" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="Back" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                <Setter TargetName="Pill" Property="Visibility" Value="Visible" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <ui:TitleBar Title="Hail settings" />
+
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="210" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <ListBox
+        x:Name="Nav"
+        Margin="10,6,4,12"
+        AutomationProperties.Name="Sections"
+        Background="Transparent"
+        BorderThickness="0"
+        ItemContainerStyle="{StaticResource NavItem}"
+        SelectionChanged="Nav_SelectionChanged">
+        <ListBoxItem Tag="General">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Style="{StaticResource NavGlyph}" Text="&#xE713;" />
+            <TextBlock Text="General" />
+          </StackPanel>
+        </ListBoxItem>
+        <ListBoxItem Tag="Providers">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Style="{StaticResource NavGlyph}" Text="&#xE71D;" />
+            <TextBlock Text="Providers" />
+          </StackPanel>
+        </ListBoxItem>
+        <ListBoxItem Tag="WebSearch">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Style="{StaticResource NavGlyph}" Text="&#xE774;" />
+            <TextBlock Text="Web search" />
+          </StackPanel>
+        </ListBoxItem>
+        <ListBoxItem Tag="Plugins">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Style="{StaticResource NavGlyph}" Text="&#xEA86;" />
+            <TextBlock Text="Plugins" />
+          </StackPanel>
+        </ListBoxItem>
+        <ListBoxItem Tag="History">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Style="{StaticResource NavGlyph}" Text="&#xE81C;" />
+            <TextBlock Text="History" />
+          </StackPanel>
+        </ListBoxItem>
+        <ListBoxItem Tag="Updates">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Style="{StaticResource NavGlyph}" Text="&#xE895;" />
+            <TextBlock Text="Updates" />
+          </StackPanel>
+        </ListBoxItem>
+        <ListBoxItem Tag="About">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Style="{StaticResource NavGlyph}" Text="&#xE946;" />
+            <TextBlock Text="About" />
+          </StackPanel>
+        </ListBoxItem>
+      </ListBox>
+
+      <ScrollViewer
+        x:Name="Scroller"
+        Grid.Column="1"
+        Padding="20,4,28,28"
+        VerticalScrollBarVisibility="Auto">
+        <Grid>
+
+          <!-- General -->
+          <StackPanel x:Name="GeneralSection" Style="{StaticResource SectionPanel}">
+            <TextBlock Style="{StaticResource SectionTitle}" Text="General" />
+
+            <Border Style="{StaticResource Card}">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Orientation="Horizontal">
+                  <Border x:Name="HotkeyCap" Style="{StaticResource KeycapStyle}">
+                    <TextBlock
+                      x:Name="HotkeyText"
+                      FontSize="14"
+                      Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                  </Border>
+                  <ui:Button
+                    x:Name="ChangeHotkeyButton"
+                    MinWidth="88"
+                    Margin="12,0,0,0"
+                    Click="ChangeHotkey_Click"
+                    Content="Change" />
+                </StackPanel>
+                <StackPanel Margin="0,0,16,0">
+                  <TextBlock Style="{StaticResource CardTitle}" Text="Shortcut" />
+                  <TextBlock x:Name="HotkeyHint" Style="{StaticResource CardText}" />
+                </StackPanel>
+              </DockPanel>
+            </Border>
+            <TextBlock x:Name="HotkeyProblem" Style="{StaticResource Problem}" />
+
+            <Border Style="{StaticResource Card}">
+              <DockPanel>
+                <ui:ToggleSwitch
+                  x:Name="StartupToggle"
+                  AutomationProperties.Name="Start with Windows"
+                  Click="StartupToggle_Click"
+                  DockPanel.Dock="Right"
+                  OffContent="Off"
+                  OnContent="On" />
+                <StackPanel Margin="0,0,16,0">
+                  <TextBlock Style="{StaticResource CardTitle}" Text="Start with Windows" />
+                  <TextBlock x:Name="StartupHint" Style="{StaticResource CardText}" />
+                </StackPanel>
+              </DockPanel>
+            </Border>
+            <TextBlock x:Name="StartupProblem" Style="{StaticResource Problem}" />
+
+            <Border Style="{StaticResource Card}">
+              <DockPanel>
+                <ui:ToggleSwitch
+                  x:Name="KeepQueryToggle"
+                  AutomationProperties.Name="Keep the last search"
+                  Click="KeepQueryToggle_Click"
+                  DockPanel.Dock="Right"
+                  OffContent="Off"
+                  OnContent="On" />
+                <StackPanel Margin="0,0,16,0">
+                  <TextBlock Style="{StaticResource CardTitle}" Text="Keep the last search" />
+                  <TextBlock Style="{StaticResource CardText}" Text="The box opens with what you typed last time, selected, instead of empty." />
+                </StackPanel>
+              </DockPanel>
+            </Border>
+            <TextBlock x:Name="GeneralProblem" Style="{StaticResource Problem}" />
+          </StackPanel>
+
+          <!-- Providers -->
+          <StackPanel x:Name="ProvidersSection" Style="{StaticResource SectionPanel}">
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Providers" />
+            <TextBlock Style="{StaticResource Intro}" Text="Each provider finds one kind of thing. One switched off here takes no part in any search until it is switched on again." />
+            <StackPanel x:Name="ProviderRows" />
+            <TextBlock x:Name="ProvidersProblem" Style="{StaticResource Problem}" />
+          </StackPanel>
+
+          <!-- Web search -->
+          <StackPanel x:Name="WebSearchSection" Style="{StaticResource SectionPanel}">
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Web search" />
+            <TextBlock Style="{StaticResource Intro}" Text="Type an engine's keyword, a space and the search: g cats searches Google. Nothing you type is sent until you press Enter on a search." />
+
+            <Border Style="{StaticResource Card}">
+              <DockPanel>
+                <ComboBox
+                  x:Name="DefaultEngine"
+                  MinWidth="200"
+                  AutomationProperties.Name="The engine the last row searches with"
+                  DisplayMemberPath="Name"
+                  DockPanel.Dock="Right"
+                  SelectionChanged="DefaultEngine_SelectionChanged" />
+                <StackPanel Margin="0,0,16,0">
+                  <TextBlock Style="{StaticResource CardTitle}" Text="The last row searches with" />
+                  <TextBlock Style="{StaticResource CardText}" Text="Every search ends with this engine's row, for when nothing else answers it." />
+                </StackPanel>
+              </DockPanel>
+            </Border>
+
+            <TextBlock Style="{StaticResource GroupLabel}" Text="Engines" />
+            <Grid Margin="2,0,52,6">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="150" />
+                <ColumnDefinition Width="90" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Style="{StaticResource CardText}" Text="Name" />
+              <TextBlock Grid.Column="1" Margin="8,2,0,0" Style="{StaticResource CardText}" Text="Keyword" />
+              <TextBlock Grid.Column="2" Margin="8,2,0,0" Style="{StaticResource CardText}" Text="Address, with {query} where the search goes" />
+            </Grid>
+            <ItemsControl x:Name="EngineRows">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="150" />
+                      <ColumnDefinition Width="90" />
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ui:TextBox
+                      AutomationProperties.Name="Engine name"
+                      MaxLength="40"
+                      Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+                    <ui:TextBox
+                      Grid.Column="1"
+                      Margin="8,0,0,0"
+                      AutomationProperties.Name="Engine keyword"
+                      MaxLength="12"
+                      Text="{Binding Keyword, UpdateSourceTrigger=PropertyChanged}" />
+                    <ui:TextBox
+                      Grid.Column="2"
+                      Margin="8,0,0,0"
+                      AutomationProperties.Name="Engine address"
+                      MaxLength="2048"
+                      Text="{Binding Template, UpdateSourceTrigger=PropertyChanged}" />
+                    <ui:Button
+                      Grid.Column="3"
+                      Width="40"
+                      Height="34"
+                      Margin="8,0,0,0"
+                      Padding="0"
+                      AutomationProperties.Name="Remove this engine"
+                      Click="RemoveEngine_Click"
+                      ToolTip="Remove this engine">
+                      <TextBlock FontFamily="{StaticResource IconFont}" FontSize="14" Text="&#xE74D;" />
+                    </ui:Button>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <ui:Button
+              x:Name="AddEngineButton"
+              Margin="0,4,0,0"
+              Click="AddEngine_Click"
+              Content="Add engine" />
+            <TextBlock x:Name="EngineProblem" Style="{StaticResource Problem}" />
+            <TextBlock x:Name="EngineNote" Style="{StaticResource Note}" />
+            <StackPanel Margin="0,14,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+              <ui:Button
+                x:Name="SaveEnginesButton"
+                MinWidth="120"
+                Appearance="Primary"
+                Click="SaveEngines_Click"
+                Content="Save engines"
+                IsEnabled="False" />
+              <ui:Button
+                x:Name="UndoEnginesButton"
+                MinWidth="120"
+                Margin="8,0,0,0"
+                Click="UndoEngines_Click"
+                Content="Undo changes"
+                IsEnabled="False" />
+            </StackPanel>
+          </StackPanel>
+
+          <!-- Plugins -->
+          <StackPanel x:Name="PluginsSection" Style="{StaticResource SectionPanel}">
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Plugins" />
+            <TextBlock Style="{StaticResource Intro}" Text="A plugin adds results to the box. It is a folder in Hail's plugins folder, and nothing in it runs until you enable it. If its files change, it is off until you look again." />
+            <StackPanel x:Name="PluginRows" />
+            <Border x:Name="NoPlugins" Style="{StaticResource Card}" Visibility="Collapsed">
+              <StackPanel>
+                <TextBlock Style="{StaticResource CardTitle}" Text="No plugins installed" />
+                <TextBlock Style="{StaticResource CardText}" Text="Copy a plugin's folder into the plugins folder, then press Reload plugins." />
+              </StackPanel>
+            </Border>
+            <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+              <ui:Button Click="OpenPluginsFolder_Click" Content="Open plugins folder" />
+              <ui:Button
+                x:Name="ReloadPluginsButton"
+                Margin="8,0,0,0"
+                Click="ReloadPlugins_Click"
+                Content="Reload plugins" />
+            </StackPanel>
+          </StackPanel>
+
+          <!-- History -->
+          <StackPanel x:Name="HistorySection" Style="{StaticResource SectionPanel}">
+            <TextBlock Style="{StaticResource SectionTitle}" Text="History" />
+            <TextBlock Style="{StaticResource Intro}" Text="Hail favours what you pick: the next time you type the same start, it comes first, and an empty box shows what you pick most. Only apps, files and commands are remembered, with the first 16 characters of what you typed. Sums and web searches never are." />
+            <Border Style="{StaticResource Card}">
+              <DockPanel>
+                <ui:Button
+                  x:Name="ClearHistoryButton"
+                  MinWidth="120"
+                  Click="ClearHistory_Click"
+                  Content="Clear history"
+                  DockPanel.Dock="Right" />
+                <StackPanel Margin="0,0,16,0" VerticalAlignment="Center">
+                  <TextBlock x:Name="HistoryCountText" Style="{StaticResource CardTitle}" />
+                  <TextBlock Style="{StaticResource CardText}" Text="Kept on this PC only, in usage.json in Hail's folder." />
+                </StackPanel>
+              </DockPanel>
+            </Border>
+          </StackPanel>
+
+          <!-- Updates -->
+          <StackPanel x:Name="UpdatesSection" Style="{StaticResource SectionPanel}">
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Updates" />
+
+            <Border Style="{StaticResource Card}">
+              <DockPanel>
+                <ui:ToggleSwitch
+                  x:Name="UpdateToggle"
+                  AutomationProperties.Name="Check for new versions once a day"
+                  Click="UpdateToggle_Click"
+                  DockPanel.Dock="Right"
+                  OffContent="Off"
+                  OnContent="On" />
+                <StackPanel Margin="0,0,16,0">
+                  <TextBlock Style="{StaticResource CardTitle}" Text="Check for new versions once a day" />
+                  <TextBlock Style="{StaticResource CardText}" Text="Hail asks GitHub for the newest version's number. Nothing you type or open is sent: the request names only Hail and its version." />
+                </StackPanel>
+              </DockPanel>
+            </Border>
+            <TextBlock x:Name="UpdatesProblem" Style="{StaticResource Problem}" />
+
+            <Border Margin="0,8,0,0" Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock x:Name="UpdateHeadline" Style="{StaticResource CardTitle}" />
+                <TextBlock x:Name="UpdateMessage" Style="{StaticResource CardText}" />
+                <ProgressBar
+                  x:Name="UpdateProgress"
+                  Height="4"
+                  Margin="0,12,0,0"
+                  Maximum="1"
+                  Visibility="Collapsed" />
+                <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                  <ui:Button
+                    x:Name="UpdatePrimaryButton"
+                    MinWidth="112"
+                    Appearance="Primary"
+                    Click="UpdatePrimary_Click" />
+                  <ui:Button
+                    x:Name="UpdateSecondaryButton"
+                    MinWidth="96"
+                    Margin="8,0,0,0"
+                    Click="UpdateSecondary_Click" />
+                  <ui:Button
+                    x:Name="UpdateTertiaryButton"
+                    MinWidth="96"
+                    Margin="8,0,0,0"
+                    Click="UpdateTertiary_Click" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <ui:Button
+              Margin="0,12,0,0"
+              Appearance="Transparent"
+              Click="Releases_Click"
+              Content="Every release, on GitHub" />
+          </StackPanel>
+
+          <!-- About -->
+          <StackPanel x:Name="AboutSection" Style="{StaticResource SectionPanel}">
+            <TextBlock Style="{StaticResource SectionTitle}" Text="About" />
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <Image
+                    Width="40"
+                    Height="40"
+                    Margin="0,0,14,0"
+                    Source="pack://application:,,,/Hail;component/hail.png"
+                    RenderOptions.BitmapScalingMode="HighQuality" />
+                  <StackPanel VerticalAlignment="Center">
+                    <TextBlock
+                      FontFamily="{StaticResource BoxDisplayFont}"
+                      FontSize="20"
+                      FontWeight="SemiBold"
+                      Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                      Text="Hail" />
+                    <TextBlock x:Name="AboutVersion" Style="{StaticResource CardText}" />
+                  </StackPanel>
+                </StackPanel>
+                <TextBlock
+                  Margin="0,14,0,0"
+                  Style="{StaticResource CardText}"
+                  FontSize="13"
+                  Text="A keyboard launcher for Windows, by Hendrik Vrey. Free to use, including at work; not open source. The plugin contract, the plugin template and guide, and the Everything plugin are MIT licensed, so anyone can write and publish plugins." />
+              </StackPanel>
+            </Border>
+            <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
+              <ui:Button Click="OpenDataFolder_Click" Content="Open Hail's folder" />
+              <ui:Button
+                Margin="8,0,0,0"
+                Click="Project_Click"
+                Content="Hail on GitHub" />
+            </StackPanel>
+            <TextBlock
+              Margin="2,10,0,0"
+              Style="{StaticResource CardText}"
+              Text="Hail's folder holds its settings, history, logs and plugins. Deleting it resets Hail; nothing else depends on it." />
+          </StackPanel>
+
+        </Grid>
+      </ScrollViewer>
+    </Grid>
+  </Grid>
+</ui:FluentWindow>

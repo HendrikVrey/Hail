@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The one network conversation Hail itself starts (Hail.md §9): asking GitHub for the newest
+    release and downloading its installer, and only after the user has said yes or pressed Check
+    now. ArchitectureTests holds every other project to naming no HTTP type, so what leaves the
+    machine is read in this folder alone.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Hail.Updates</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hail.Core\Hail.Core.csproj" />
+    <ProjectReference Include="..\Hail.Windows\Hail.Windows.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Hail.Updates.Tests" />
+  </ItemGroup>
+
+</Project>

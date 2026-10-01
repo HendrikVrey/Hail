@@ -20,8 +20,8 @@ public interface ISessionControl
 /// <summary>What Hail itself can be asked to do from the box.</summary>
 public interface IHostCommands
 {
-    /// <summary>Hail's settings file, which the box offers to open until M3 brings a settings window.</summary>
-    string SettingsPath { get; }
+    /// <summary>Opens Hail's settings window. Returns at once: it opens after the box has hidden.</summary>
+    void OpenSettings();
 
     /// <summary>Where plugins are installed, one folder each; it exists once Hail has started.</summary>
     string PluginsFolder { get; }

@@ -30,6 +30,8 @@
 
   <ItemGroup>
     <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- MIT, unlike Hail itself, so the plugin can be copied and adapted; it travels with every copy. -->
+    <None Include="LICENSE" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Hail.Core.Ports;
@@ -10,13 +11,13 @@ namespace Hail.Persistence;
 public sealed record SettingsLoad(HailSettings Settings, IReadOnlyList<string> Problems);
 
 /// <summary>
-/// Reads <c>settings.json</c> field by field (Hail.md §10.4): a value of the wrong kind falls
-/// back to its default alone, with a line saying so, and the rest of the file still counts. A
-/// missing file is written with the defaults, so there is something to open and edit.
+/// Reads and writes <c>settings.json</c> (Hail.md §10.4). Reading is field by field: a value of
+/// the wrong kind falls back to its default alone, with a line saying so, and the rest of the
+/// file still counts. A missing file is written with the defaults, so there is something to open.
 /// </summary>
 /// <remarks>
-/// The file accepts comments and trailing commas, because people edit it by hand until the
-/// settings window arrives in M3.
+/// The file accepts comments and trailing commas, because people edit it by hand. The settings
+/// window writes it whole, so a comment does not survive a change made there.
 /// </remarks>
 public sealed class SettingsStore(HailPaths paths)
 {
@@ -30,7 +31,14 @@ public sealed class SettingsStore(HailPaths paths)
         MaxDepth = 16,
     };
 
-    private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true };
+    // Relaxed escaping so a person reading the file sees "Alt+Space", not "Alt\u002BSpace". The
+    // file is read by Hail and by people, never embedded in a page, which is what the strict
+    // default guards against.
+    private static readonly JsonSerializerOptions WriteOptions = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
 
     public string FilePath => paths.Settings;
 
@@ -39,7 +47,7 @@ public sealed class SettingsStore(HailPaths paths)
         var path = paths.Settings;
         if (!File.Exists(path))
         {
-            WriteDefaults(path);
+            TryWrite(path, HailSettings.Default);
             return new SettingsLoad(HailSettings.Default, []);
         }
 
@@ -59,6 +67,50 @@ public sealed class SettingsStore(HailPaths paths)
         }
 
         return Parse(text);
+    }
+
+    /// <summary>Writes <paramref name="settings"/> whole, atomically.</summary>
+    /// <exception cref="IOException">The disk refused; the file on disk is as it was.</exception>
+    /// <exception cref="UnauthorizedAccessException">The folder cannot be written.</exception>
+    public void Save(HailSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        AtomicFile.WriteAllText(paths.Settings, Format(settings));
+    }
+
+    /// <summary>The file's text for <paramref name="settings"/>; the whole of the writing, so a test needs no disk.</summary>
+    public static string Format(HailSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        var document = new JsonObject
+        {
+            ["hotkey"] = settings.Hotkey.Display,
+            ["keepLastQuery"] = settings.KeepLastQuery,
+            ["webSearch"] = new JsonObject
+            {
+                ["engines"] = new JsonArray([.. settings.WebSearch.Engines.Select(e => (JsonNode)new JsonObject
+                {
+                    ["keyword"] = e.Keyword,
+                    ["name"] = e.Name,
+                    ["template"] = e.Template,
+                })]),
+            },
+            ["disabledProviders"] = new JsonArray([.. settings.DisabledProviders.Order(StringComparer.Ordinal).Select(id => (JsonNode)id)]),
+        };
+
+        // No engines, no default: an empty one would read back as a mistake.
+        if (settings.WebSearch.Engines.Count > 0)
+        {
+            ((JsonObject)document["webSearch"]!).Insert(0, "defaultEngine", settings.WebSearch.DefaultKeyword);
+        }
+
+        // Absent until answered: a written null would read as an answer to someone editing the file.
+        if (settings.CheckForUpdates is { } allowed)
+        {
+            document["checkForUpdates"] = allowed;
+        }
+
+        return document.ToJsonString(WriteOptions) + Environment.NewLine;
     }
 
     /// <summary>Reads settings from text; the whole of the reading, so a test needs no disk.</summary>
@@ -89,17 +141,24 @@ public sealed class SettingsStore(HailPaths paths)
             var settings = new HailSettings(
                 ReadBool(root, "keepLastQuery", defaults.KeepLastQuery, problems),
                 ReadWebSearch(root, defaults.WebSearch, problems),
-                ReadStringSet(root, "disabledProviders", defaults.DisabledProviders, problems));
+                ReadStringSet(root, "disabledProviders", defaults.DisabledProviders, problems))
+            {
+                Hotkey = ReadHotkey(root, defaults.Hotkey, problems),
+                CheckForUpdates = ReadOptionalBool(root, "checkForUpdates", problems),
+            };
 
             return new SettingsLoad(settings, problems);
         }
     }
 
-    private static bool ReadBool(JsonElement root, string name, bool fallback, List<string> problems)
+    private static bool ReadBool(JsonElement root, string name, bool fallback, List<string> problems) =>
+        ReadOptionalBool(root, name, problems) ?? fallback;
+
+    private static bool? ReadOptionalBool(JsonElement root, string name, List<string> problems)
     {
-        if (!root.TryGetProperty(name, out var value))
+        if (!root.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null)
         {
-            return fallback;
+            return null;
         }
 
         if (value.ValueKind is JsonValueKind.True or JsonValueKind.False)
@@ -108,6 +167,28 @@ public sealed class SettingsStore(HailPaths paths)
         }
 
         problems.Add($"\"{name}\" must be true or false; the default was used.");
+        return null;
+    }
+
+    private static Chord ReadHotkey(JsonElement root, Chord fallback, List<string> problems)
+    {
+        if (!root.TryGetProperty("hotkey", out var value))
+        {
+            return fallback;
+        }
+
+        if (value.ValueKind != JsonValueKind.String)
+        {
+            problems.Add($"\"hotkey\" must be written like \"Alt+Space\"; {fallback.Display} was used.");
+            return fallback;
+        }
+
+        if (Chord.TryParse(value.GetString(), out var problem) is { } chord)
+        {
+            return chord;
+        }
+
+        problems.Add($"\"hotkey\" was not used: {problem}; {fallback.Display} was used.");
         return fallback;
     }
 
@@ -204,28 +285,11 @@ public sealed class SettingsStore(HailPaths paths)
                 : null;
     }
 
-    private static void WriteDefaults(string path)
+    private static void TryWrite(string path, HailSettings settings)
     {
-        var defaults = HailSettings.Default;
-        var document = new JsonObject
-        {
-            ["keepLastQuery"] = defaults.KeepLastQuery,
-            ["webSearch"] = new JsonObject
-            {
-                ["defaultEngine"] = defaults.WebSearch.DefaultKeyword,
-                ["engines"] = new JsonArray([.. defaults.WebSearch.Engines.Select(e => (JsonNode)new JsonObject
-                {
-                    ["keyword"] = e.Keyword,
-                    ["name"] = e.Name,
-                    ["template"] = e.Template,
-                })]),
-            },
-            ["disabledProviders"] = new JsonArray(),
-        };
-
         try
         {
-            AtomicFile.WriteAllText(path, document.ToJsonString(WriteOptions) + Environment.NewLine);
+            AtomicFile.WriteAllText(path, Format(settings));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

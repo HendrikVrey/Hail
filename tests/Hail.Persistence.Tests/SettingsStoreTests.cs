@@ -88,7 +88,7 @@ public sealed class SettingsStoreTests : IDisposable
     [Fact]
     public void Unknown_fields_are_ignored()
     {
-        Assert.Empty(SettingsStore.Parse("""{ "theme": "dark", "hotkey": 5 }""").Problems);
+        Assert.Empty(SettingsStore.Parse("""{ "theme": "dark", "shortcutSound": 5 }""").Problems);
     }
 
     [Fact]

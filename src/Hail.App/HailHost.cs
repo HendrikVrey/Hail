@@ -9,6 +9,7 @@ using Hail.Core.Hosting;
 using Hail.Core.Matching;
 using Hail.Core.Ports;
 using Hail.Core.Settings;
+using Hail.Core.Updates;
 using Hail.Persistence;
 using Hail.Plugins;
 using Hail.Providers.Apps;
@@ -35,7 +36,9 @@ namespace Hail.App;
 /// <summary>
 /// The composition root and the process's lifetime: it builds everything once, answers the
 /// hotkey, the tray and a second start, and takes it all down on Quit. Plugins are read after
-/// the box is ready and again on every Reload plugins (Hail.md §6.3; HailHost.Plugins.cs).
+/// the box is ready and again on every Reload plugins (Hail.md §6.3; HailHost.Plugins.cs); the
+/// settings window's changes are put in force here (HailHost.Settings.cs); and the update check
+/// runs from here (HailHost.Updates.cs).
 /// </summary>
 internal sealed partial class HailHost(SingleInstance instance, FileLog log, HailPaths paths) : IDisposable, IHostCommands
 {
@@ -48,9 +51,9 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
     /// <summary>History is written this long after the last change, so a burst of picks is one write.</summary>
     private static readonly TimeSpan HistorySaveDelay = TimeSpan.FromSeconds(2);
 
-    private readonly HotkeyChord _chord = HotkeyChord.AltSpace;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly StartupRegistration _startup = new();
+    private readonly SettingsStore _settingsStore = new(paths);
     private readonly Lock _saveGate = new();
 
     private StaWorker? _worker;
@@ -62,7 +65,9 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
     private HailSettings? _settings;
     private FuzzyMatcher? _matcher;
     private WpfClipboard? _clipboard;
-    private IReadOnlyList<ProviderRegistration> _builtIns = [];
+    private List<ProviderRegistration> _builtIns = [];
+    private IReadOnlyList<ProviderRegistration> _pluginRegistrations = [];
+    private Chord _chord = Chord.AltSpace;
     private SearchViewModel? _model;
     private SearchWindow? _box;
     private HostWindow? _host;
@@ -70,8 +75,6 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
     private bool _hotkeyRegistered;
     private bool _savePending;
     private bool _disposed;
-
-    public string SettingsPath => paths.Settings;
 
     public string PluginsFolder => paths.Plugins;
 
@@ -81,6 +84,7 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
 
         var settings = LoadSettings();
         _settings = settings;
+        _chord = settings.Hotkey;
         _history = LoadHistory();
         _history.Changed += ScheduleHistorySave;
 
@@ -103,7 +107,7 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
 
         _model = new SearchViewModel(_supervisor, _history, new IconCache(new ShellIcons(_worker)), log);
         _box = new SearchWindow(_model, log, settings.KeepLastQuery);
-        _box.SettingsRequested += () => _ = OpenSettingsAsync();
+        _box.SettingsRequested += () => OpenSettings(SettingsSection.General);
         _box.Prepare();
 
         _host = new HostWindow();
@@ -112,15 +116,24 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
         _host.TaskbarCreated += () => _tray?.Restore();
         _host.ThemeChanged += OnThemeChanged;
 
-        _tray = new TrayIcon(_host.Handle, $"Hail ({_chord.Display})");
+        _tray = new TrayIcon(_host.Handle, "Hail");
         RegisterHotkey();
+        _tray.SetTip(TrayTip());
+        CreateUpdater(settings);
 
         // The window is ready; now the Start menu is read, so the first summon already has it,
         // and the plugins folder, whose plugins load only when a query first reaches them.
         _ = RefreshCatalogAsync("startup");
         _ = ReloadPluginsAsync("startup");
         _ = ListenForSecondStartAsync();
+        _ = StartUpdatesAsync();
     }
+
+    /// <summary>The box's "Hail settings": after the action that asked has finished and the box has hidden.</summary>
+    public void OpenSettings() =>
+        Application.Current.Dispatcher.BeginInvoke(
+            () => OpenSettings(SettingsSection.General),
+            System.Windows.Threading.DispatcherPriority.Background);
 
     /// <summary>The box's "Quit Hail": after the action that asked has finished and the box has hidden.</summary>
     public void Quit() =>
@@ -142,7 +155,9 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
         }
 
         SaveHistoryNow("quitting", onlyIfChanged: true);
+        _settingsWindow?.Close();
         ShutDownPlugins();
+        _updateService?.Dispose();
 
         _tray?.Dispose();
         _box?.CloseForQuit();
@@ -161,12 +176,6 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
     {
         PluginContext Context(string id) => ContextFor(id, settings: null);
 
-        var web = new WebSearchProvider(settings.WebSearch);
-        foreach (var problem in web.Load())
-        {
-            log.LogError(problem);
-        }
-
         var all = new List<ProviderRegistration>
         {
             new(AppsProvider.ProviderId, "Apps", new AppsProvider(_catalog!), Context(AppsProvider.ProviderId)),
@@ -179,13 +188,25 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
                 Debounce = FilesDebounce,
             },
             new(CommandsProvider.ProviderId, "Commands", new CommandsProvider(new SessionControl(), this), Context(CommandsProvider.ProviderId)),
-            new(WebSearchProvider.ProviderId, "Web search", web, Context(WebSearchProvider.ProviderId))
-            {
-                Keywords = [.. web.Keywords.Select(k => new ProviderKeyword(k.Keyword, k.Name))],
-            },
+            WebRegistration(settings.WebSearch),
         };
 
         return all;
+    }
+
+    /// <summary>The web search, built afresh whenever its engines change; the other built-ins keep their state.</summary>
+    private ProviderRegistration WebRegistration(WebSearchOptions options)
+    {
+        var web = new WebSearchProvider(options);
+        foreach (var problem in web.Load())
+        {
+            log.LogError(problem);
+        }
+
+        return new(WebSearchProvider.ProviderId, "Web search", web, ContextFor(WebSearchProvider.ProviderId, settings: null))
+        {
+            Keywords = [.. web.Keywords.Select(k => new ProviderKeyword(k.Keyword, k.Name))],
+        };
     }
 
     /// <summary>
@@ -244,7 +265,7 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
 
     private HailSettings LoadSettings()
     {
-        var load = new SettingsStore(paths).Load();
+        var load = _settingsStore.Load();
         foreach (var problem in load.Problems)
         {
             log.LogError($"Settings: {problem}");
@@ -330,14 +351,16 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
             return;
         }
 
-        // Hail.md §8: Hail still runs, and says so, rather than running without a way in.
+        // Hail.md §8: Hail still runs, and says so, rather than running without a way in; the
+        // notification opens the settings window where another shortcut can be chosen.
         log.LogError($"{_chord.Display} could not be registered (Win32 error {error}).");
-        Tell(
+        Notify(
             $"{_chord.Display} is taken",
-            error == GlobalHotkey.ErrorAlreadyRegistered
-                ? $"Another program already uses {_chord.Display} (PowerToys Run often does). Click the Hail icon to open the box."
-                : $"Windows would not give Hail {_chord.Display}. Click the Hail icon to open the box.");
+            $"{GlobalHotkey.Describe(_chord, error)} Click here to choose another shortcut, or click the Hail icon to open the box.",
+            NoticeAction.OpenGeneral);
     }
+
+    private string TrayTip() => _hotkeyRegistered ? $"Hail ({_chord.Display})" : "Hail";
 
     private void Toggle()
     {
@@ -358,6 +381,8 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
         {
             _ = RefreshCatalogAsync("summon");
         }
+
+        CheckForUpdatesIfDue();
     }
 
     private void OnTray(TrayEvent trayEvent)
@@ -371,7 +396,7 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
                 ShowTrayMenu();
                 break;
             case TrayEvent.NotificationClicked:
-                AskAboutNextPlugin();
+                OnNotificationClicked();
                 break;
         }
     }
@@ -385,22 +410,13 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
         menu.Items.Add(open);
         menu.Items.Add(new Separator());
 
-        menu.Items.Add(StartupItem());
+        var settings = new MenuItem { Header = "Settings..." };
+        settings.Click += (_, _) => OpenSettings(SettingsSection.General);
+        menu.Items.Add(settings);
         menu.Items.Add(PluginsMenu());
 
-        var settings = new MenuItem { Header = "Open settings file" };
-        settings.Click += (_, _) => _ = OpenSettingsAsync();
-        menu.Items.Add(settings);
-
-        var clear = new MenuItem { Header = "Clear history", IsEnabled = _history?.Count > 0 };
-        clear.Click += (_, _) =>
-        {
-            _history?.Clear();
-            log.LogInfo("History cleared from the tray.");
-        };
-        menu.Items.Add(clear);
-
-        // A provider switched off says so here (Hail.md §6.5), until the settings window exists.
+        // A provider switched off for failing says so here (Hail.md §6.5); it is on again at the
+        // next reload.
         var faults = _supervisor?.Faults ?? [];
         if (faults.Count > 0)
         {
@@ -424,64 +440,6 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
         if (PresentationSource.FromVisual(menu) is HwndSource source)
         {
             WindowEffects.BringToFront(source.Handle);
-        }
-    }
-
-    /// <summary>"Start with Windows", read from the registry each time the menu opens (Hail.md §5).</summary>
-    private MenuItem StartupItem()
-    {
-        var executable = Environment.ProcessPath;
-        var state = executable is null ? StartupState.Off : _startup.StateFor(executable);
-        var item = new MenuItem
-        {
-            Header = state switch
-            {
-                StartupState.DisabledByUser => "Start with Windows (switched off in Task Manager)",
-                StartupState.OnElsewhere => "Start with Windows (another copy of Hail is registered)",
-                _ => "Start with Windows",
-            },
-            IsCheckable = true,
-            IsChecked = state == StartupState.On,
-            IsEnabled = executable is not null,
-        };
-
-        item.Click += (_, _) =>
-        {
-            try
-            {
-                if (state == StartupState.On)
-                {
-                    _startup.Disable();
-                    log.LogInfo("Start at sign-in switched off.");
-                }
-                else
-                {
-                    _startup.Enable(executable!);
-                    log.LogInfo("Start at sign-in switched on.");
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
-            {
-                log.LogError("Changing start at sign-in failed.", ex);
-                Tell("Start with Windows", "Windows would not let Hail change this. The log has the reason.");
-            }
-        };
-
-        return item;
-    }
-
-    private async Task OpenSettingsAsync()
-    {
-        try
-        {
-            await _launcher!.OpenPathAsync(paths.Settings, _lifetime.Token).ConfigureAwait(true);
-        }
-#pragma warning disable CA1031 // Opening an editor failed; said in the log and the tray, and Hail carries on.
-        catch (Exception ex)
-#pragma warning restore CA1031
-        {
-            log.LogError("Opening the settings file failed.", ex);
-            Tell("Hail settings", $"The settings file could not be opened. It is {paths.Settings}.");
         }
     }
 

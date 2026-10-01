@@ -15,6 +15,7 @@
     <Project Path="src/Hail.Providers/Hail.Providers.csproj" />
     <Project Path="src/Hail.Windows/Hail.Windows.csproj" />
     <Project Path="src/Hail.Persistence/Hail.Persistence.csproj" />
+    <Project Path="src/Hail.Updates/Hail.Updates.csproj" />
     <Project Path="src/Hail.App/Hail.App.csproj" />
   </Folder>
   <Folder Name="/tests/">
@@ -25,6 +26,7 @@
     <Project Path="tests/Hail.Windows.Tests/Hail.Windows.Tests.csproj" />
     <Project Path="tests/Hail.Persistence.Tests/Hail.Persistence.Tests.csproj" />
     <Project Path="tests/Hail.App.Tests/Hail.App.Tests.csproj" />
+    <Project Path="tests/Hail.Updates.Tests/Hail.Updates.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/plugins/">
     <Project Path="tests/plugins/Hail.TestPlugin.Alpha/Hail.TestPlugin.Alpha.csproj" />

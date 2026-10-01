@@ -29,8 +29,8 @@ internal sealed partial class HailHost
     private PluginManager? _plugins;
     private PluginConsentWindow? _consent;
 
-    /// <summary>Whether the last notification was about plugins waiting, so clicking it should ask.</summary>
-    private bool _noticeAsksAboutPlugins;
+    /// <summary>What clicking the last notification does.</summary>
+    private NoticeAction _noticeAction;
     private bool _reloading;
     private bool _reloadAgain;
 
@@ -119,12 +119,14 @@ internal sealed partial class HailHost
 
         // The box lets go of the old set's rows before the old set is unloaded.
         var previous = plugins.Adopt(scan);
-        _supervisor!.Replace(Compose(scan.Registrations));
+        _pluginRegistrations = scan.Registrations;
+        _supervisor!.Replace(Compose(_pluginRegistrations));
         _model!.ProvidersReplaced();
         _box!.Refresh();
 
         log.LogInfo($"Plugins read ({reason}): {scan.Entries.Count} found, {scan.Registrations.Count} enabled.");
         Announce(scan.Entries);
+        PluginsChanged?.Invoke();
 
         if (previous.Any(e => e.Provider is not null))
         {
@@ -203,22 +205,32 @@ internal sealed partial class HailHost
                 ? ("A plugin has changed", $"{waiting[0].Name}'s files have changed since you enabled it, so it is off until you look. Click here to decide.")
                 : ("A plugin is waiting", $"{waiting[0].Name} is in Hail's plugins folder and stays off until you enable it. Click here to decide.")
             : ("Plugins are waiting", $"{waiting.Length} plugins in Hail's plugins folder stay off until you decide. Click here, or find them under Plugins in the tray.");
-        _tray?.Notify(title, text, warning: false);
-        _noticeAsksAboutPlugins = true;
+        Notify(title, text, NoticeAction.AskAboutPlugins, warning: false);
     }
 
     /// <summary>A notification that is not an invitation: clicking it opens nothing.</summary>
-    private void Tell(string title, string text)
+    private void Tell(string title, string text) => Notify(title, text, NoticeAction.None);
+
+    /// <summary>A notification whose click does <paramref name="action"/>; only the last one shown counts.</summary>
+    private void Notify(string title, string text, NoticeAction action, bool warning = true)
     {
-        _noticeAsksAboutPlugins = false;
-        _tray?.Notify(title, text);
+        _noticeAction = action;
+        _tray?.Notify(title, text, warning);
     }
 
-    private void AskAboutNextPlugin()
+    private void OnNotificationClicked()
     {
-        if (_noticeAsksAboutPlugins && _plugins?.Entries.FirstOrDefault(e => e.AwaitsAnswer) is { } next)
+        switch (_noticeAction)
         {
-            AskAbout(next);
+            case NoticeAction.AskAboutPlugins when _plugins?.Entries.FirstOrDefault(e => e.AwaitsAnswer) is { } next:
+                AskAbout(next);
+                break;
+            case NoticeAction.OpenGeneral:
+                OpenSettings(SettingsSection.General);
+                break;
+            case NoticeAction.OpenUpdates:
+                OpenSettings(SettingsSection.Updates);
+                break;
         }
     }
 

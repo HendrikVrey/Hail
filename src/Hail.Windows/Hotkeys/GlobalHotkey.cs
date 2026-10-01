@@ -1,32 +1,12 @@
 using System.Runtime.InteropServices;
+using Hail.Core.Settings;
 using Hail.Windows.Interop;
 
 namespace Hail.Windows.Hotkeys;
 
-[Flags]
-public enum HotkeyModifiers : uint
-{
-    None = 0,
-    Alt = 0x0001,
-    Control = 0x0002,
-    Shift = 0x0004,
-    Windows = 0x0008,
-}
-
-/// <summary>A system-wide chord, and how the user would write it.</summary>
-public sealed record HotkeyChord(HotkeyModifiers Modifiers, uint VirtualKey, string Display)
-{
-    private const uint VkSpace = 0x20;
-
-    /// <summary>
-    /// The default (Hail.md §8): Windows' own chord for a window's system menu, which
-    /// registering it replaces everywhere, as PowerToys Run did.
-    /// </summary>
-    public static HotkeyChord AltSpace { get; } = new(HotkeyModifiers.Alt, VkSpace, "Alt+Space");
-}
-
 /// <summary>
-/// Registers a chord with Windows, delivered as WM_HOTKEY to a window of Hail's own.
+/// Registers a chord with Windows, delivered as WM_HOTKEY to a window of Hail's own. The chord's
+/// modifier bits are Windows' own <c>MOD_*</c> values (<see cref="ChordModifiers"/>).
 /// </summary>
 public static class GlobalHotkey
 {
@@ -39,13 +19,22 @@ public static class GlobalHotkey
     private const uint NoRepeat = 0x4000;
 
     /// <summary>Zero when registered; otherwise the Win32 error that refused it.</summary>
-    public static int Register(nint window, int id, HotkeyChord chord)
+    public static int Register(nint window, int id, Chord chord)
     {
         ArgumentNullException.ThrowIfNull(chord);
-        return User32.RegisterHotKey(window, id, (uint)chord.Modifiers | NoRepeat, chord.VirtualKey)
+        return User32.RegisterHotKey(window, id, (uint)chord.Modifiers | NoRepeat, (uint)chord.VirtualKey)
             ? 0
             : Marshal.GetLastPInvokeError();
     }
 
     public static void Unregister(nint window, int id) => User32.UnregisterHotKey(window, id);
+
+    /// <summary>What to tell the user when <see cref="Register"/> answered <paramref name="error"/>.</summary>
+    public static string Describe(Chord chord, int error)
+    {
+        ArgumentNullException.ThrowIfNull(chord);
+        return error == ErrorAlreadyRegistered
+            ? $"Another program already uses {chord.Display}{(chord == Chord.AltSpace ? " (PowerToys Run often does)" : string.Empty)}."
+            : $"Windows would not give Hail {chord.Display} (error {error}).";
+    }
 }
