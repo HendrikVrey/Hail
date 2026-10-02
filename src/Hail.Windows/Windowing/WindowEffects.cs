@@ -21,6 +21,28 @@ public static class WindowEffects
     }
 
     /// <summary>
+    /// Takes the system menu, and with it the close, minimise and maximise buttons, off a window
+    /// that draws no caption of its own. A window whose frame is extended under a transparent
+    /// client area otherwise shows those buttons through it.
+    /// </summary>
+    public static void RemoveCaptionButtons(nint window)
+    {
+        var style = User32.GetWindowLongPtr(window, User32.GWL_STYLE);
+        style &= ~(User32.WS_SYSMENU | User32.WS_MINIMIZEBOX | User32.WS_MAXIMIZEBOX);
+        User32.SetWindowLongPtr(window, User32.GWL_STYLE, style);
+
+        // A changed style takes effect on the frame only when Windows is told the frame changed.
+        _ = User32.SetWindowPos(
+            window,
+            0,
+            0,
+            0,
+            0,
+            0,
+            User32.SWP_NOMOVE | User32.SWP_NOSIZE | User32.SWP_NOZORDER | User32.SWP_NOACTIVATE | User32.SWP_FRAMECHANGED);
+    }
+
+    /// <summary>
     /// Asks for the acrylic Windows 11 gives transient surfaces, across the whole window.
     /// False where the system has no backdrops (Windows 10, and Windows 11 before 22H2), and
     /// the caller then paints a solid background of its own.

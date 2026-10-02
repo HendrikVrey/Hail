@@ -108,13 +108,19 @@ internal unsafe struct NOTIFYICONDATAW
 internal static partial class User32
 {
     public const int WM_HOTKEY = 0x0312;
+    public const int GWL_STYLE = -16;
     public const int GWL_EXSTYLE = -20;
+    public const nint WS_SYSMENU = 0x00080000;
+    public const nint WS_MINIMIZEBOX = 0x00020000;
+    public const nint WS_MAXIMIZEBOX = 0x00010000;
     public const nint WS_EX_TOOLWINDOW = 0x00000080;
     public const nint WS_EX_APPWINDOW = 0x00040000;
     public const uint MONITOR_DEFAULTTONEAREST = 2;
     public const uint SWP_NOSIZE = 0x0001;
+    public const uint SWP_NOMOVE = 0x0002;
     public const uint SWP_NOZORDER = 0x0004;
     public const uint SWP_NOACTIVATE = 0x0010;
+    public const uint SWP_FRAMECHANGED = 0x0020;
     public const uint IMAGE_ICON = 1;
     public const int SM_CXSMICON = 49;
     public const int SM_CYSMICON = 50;

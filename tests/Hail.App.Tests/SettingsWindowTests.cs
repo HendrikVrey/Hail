@@ -179,18 +179,77 @@ public sealed class SettingsWindowTests
     }
 
     [Fact]
-    public void Escape_does_not_close_the_window_over_unsaved_engines()
+    public void Closing_saves_engines_that_pass_their_checks()
+    {
+        WindowUi.Run(host =>
+        {
+            var window = Shown(new SettingsWindow(host, SettingsSection.WebSearch)).Window;
+            ((IList<SettingsWindow.EngineRow>)window.EngineRows.ItemsSource)[0].Name = "Google Search";
+
+            Press(window, Key.Escape);
+
+            Assert.False(window.IsVisible);
+            Assert.Equal(1, host.Applied);
+            Assert.Equal("Google Search", host.Settings.WebSearch.Engines[0].Name);
+            return Task.CompletedTask;
+        });
+    }
+
+    [Fact]
+    public void Closing_over_engines_that_fail_keeps_the_window_open_and_says_why()
+    {
+        WindowUi.Run(host =>
+        {
+            using var shown = Shown(new SettingsWindow(host, SettingsSection.General));
+            var window = shown.Window;
+            window.ShowSection(SettingsSection.WebSearch);
+            ((IList<SettingsWindow.EngineRow>)window.EngineRows.ItemsSource)[1].Keyword = "g";
+            window.ShowSection(SettingsSection.General);
+
+            window.Close();
+
+            Assert.True(window.IsVisible);
+            Assert.Equal(SettingsSection.WebSearch, window.Section);
+            Assert.Contains("Undo changes", window.EngineProblem.Text, StringComparison.Ordinal);
+            Assert.Equal(0, host.Applied);
+
+            window.UndoEnginesButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            return Task.CompletedTask;
+        });
+    }
+
+    [Fact]
+    public void Leaving_the_web_search_section_saves_engines_that_pass()
     {
         WindowUi.Run(host =>
         {
             using var shown = Shown(new SettingsWindow(host, SettingsSection.WebSearch));
             var window = shown.Window;
-            ((IList<SettingsWindow.EngineRow>)window.EngineRows.ItemsSource)[0].Name = "Changed";
+            ((IList<SettingsWindow.EngineRow>)window.EngineRows.ItemsSource)[0].Name = "Google Search";
 
-            Press(window, Key.Escape);
+            window.Nav.SelectedIndex = 0;
 
-            Assert.True(window.IsVisible);
-            Assert.Contains("not saved", window.EngineProblem.Text, StringComparison.Ordinal);
+            Assert.Equal(1, host.Applied);
+            Assert.False(window.SaveEnginesButton.IsEnabled);
+            return Task.CompletedTask;
+        });
+    }
+
+    [Fact]
+    public void A_recording_ended_by_the_focus_moving_says_nothing_changed()
+    {
+        WindowUi.Run(host =>
+        {
+            using var shown = Shown(new SettingsWindow(host, SettingsSection.General));
+            var window = shown.Window;
+            window.ChangeHotkeyButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+
+            window.CancelRecording(becauseFocusMoved: true);
+
+            Assert.False(window.IsRecordingHotkey);
+            Assert.Equal("Alt+Space", window.HotkeyText.Text);
+            Assert.Equal(Visibility.Visible, window.HotkeyNote.Visibility);
+            Assert.Contains("Alt+Space still shows the box", window.HotkeyNote.Text, StringComparison.Ordinal);
             return Task.CompletedTask;
         });
     }

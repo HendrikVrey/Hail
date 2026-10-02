@@ -31,6 +31,7 @@ internal sealed partial class SettingsWindow
     private readonly ObservableCollection<EngineRow> _engines = [];
     private bool _loading;
     private bool _recording;
+    private bool _quitting;
 
     public SettingsWindow(ISettingsHost host, SettingsSection section)
     {
@@ -45,6 +46,7 @@ internal sealed partial class SettingsWindow
         SourceInitialized += (_, _) => HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(Hook);
         _host.PluginsChanged += OnPluginsChanged;
         _host.Updates.StatusChanged += OnUpdateStatusChanged;
+        Closing += OnClosing;
         Closed += (_, _) =>
         {
             _host.PluginsChanged -= OnPluginsChanged;
@@ -55,9 +57,10 @@ internal sealed partial class SettingsWindow
         // The recorder listens only while the user is looking at it. Anything that moves them
         // on (another window, another section, a click elsewhere) ends it and takes the old
         // shortcut back, or a Ctrl+A typed into a text box later would become the shortcut and
-        // Alt+Space would stay dead meanwhile.
-        Deactivated += (_, _) => CancelRecording();
-        ChangeHotkeyButton.LostKeyboardFocus += (_, _) => CancelRecording();
+        // Alt+Space would stay dead meanwhile. It says so, or the shortcut looks to have reset
+        // by itself (a Win+ chord Windows keeps for itself takes the focus away exactly so).
+        Deactivated += (_, _) => CancelRecording(becauseFocusMoved: true);
+        ChangeHotkeyButton.LostKeyboardFocus += (_, _) => CancelRecording(becauseFocusMoved: true);
 
         LoadAll();
         ShowSection(section);
@@ -68,6 +71,13 @@ internal sealed partial class SettingsWindow
 
     /// <summary>Whether the shortcut recorder is waiting for keys.</summary>
     public bool IsRecordingHotkey => _recording;
+
+    /// <summary>Closes the window because Hail is quitting: engines that pass are saved, others are let go.</summary>
+    public void CloseForQuit()
+    {
+        _quitting = true;
+        Close();
+    }
 
     /// <summary>Brings <paramref name="section"/> into view.</summary>
     public void ShowSection(SettingsSection section)
@@ -158,6 +168,7 @@ internal sealed partial class SettingsWindow
         _recording = true;
         _host.SuspendHotkey();
         HotkeyProblem.Visibility = Visibility.Collapsed;
+        HotkeyNote.Visibility = Visibility.Collapsed;
         HotkeyText.Text = "Press keys";
         HotkeyHint.Text = "Press the new shortcut, holding Ctrl, Alt or Win with a letter, a digit, Space or a function key. Escape cancels.";
         ChangeHotkeyButton.Content = "Cancel";
@@ -165,11 +176,19 @@ internal sealed partial class SettingsWindow
     }
 
     /// <summary>Ends a recording that is under way, taking the saved shortcut back. Does nothing otherwise.</summary>
-    internal void CancelRecording()
+    /// <param name="becauseFocusMoved">The user did not ask; the window says why nothing changed.</param>
+    internal void CancelRecording(bool becauseFocusMoved = false)
     {
-        if (_recording)
+        if (!_recording)
         {
-            EndRecording(resume: true);
+            return;
+        }
+
+        EndRecording(resume: true);
+        if (becauseFocusMoved)
+        {
+            HotkeyProblem.Visibility = Visibility.Collapsed;
+            Report(HotkeyNote, $"Not changed: the keys stopped reaching this window before a shortcut was pressed, so {_host.Settings.Hotkey.Display} still shows the box. Choose Change and press the new shortcut here.");
         }
     }
 
@@ -204,7 +223,7 @@ internal sealed partial class SettingsWindow
 
         if (IsModifier(key))
         {
-            HotkeyText.Text = modifiers == ChordModifiers.None ? "Press keys" : Chord.ModifiersDisplay(modifiers) + "+";
+            ShowHeldModifiers(modifiers);
             return;
         }
 
@@ -224,7 +243,18 @@ internal sealed partial class SettingsWindow
 
         HotkeyProblem.Visibility = Visibility.Collapsed;
         EndRecording(resume: false);
+        Report(HotkeyNote, $"Saved. {chord.Display} shows the box now.");
     }
+
+    /// <summary>A key let go while recording: the keycap follows the modifiers still held, back to "Press keys".</summary>
+    private void RecordRelease(KeyEventArgs e)
+    {
+        e.Handled = true;
+        ShowHeldModifiers(CurrentModifiers());
+    }
+
+    private void ShowHeldModifiers(ChordModifiers modifiers) =>
+        HotkeyText.Text = modifiers == ChordModifiers.None ? "Press keys" : Chord.ModifiersDisplay(modifiers) + "+";
 
     private static ChordModifiers CurrentModifiers()
     {
@@ -680,6 +710,14 @@ internal sealed partial class SettingsWindow
         if (Nav.SelectedItem is ListBoxItem { Tag: string tag } && Enum.TryParse<SettingsSection>(tag, out var section) && section != Section)
         {
             CancelRecording();
+
+            // Every other setting is saved as it changes; engines that pass their checks are
+            // saved on the way out of their section too, so a change is not left behind there.
+            if (Section == SettingsSection.WebSearch && SaveEnginesButton.IsEnabled)
+            {
+                SaveEngines();
+            }
+
             ShowSection(section);
         }
     }
@@ -698,14 +736,32 @@ internal sealed partial class SettingsWindow
         }
 
         e.Handled = true;
-        if (SaveEnginesButton.IsEnabled)
+        Close();
+    }
+
+    private void Window_PreviewKeyUp(object sender, KeyEventArgs e)
+    {
+        if (_recording)
         {
-            ShowSection(SettingsSection.WebSearch);
-            Report(EngineProblem, "The engines have changes that are not saved. Save them, or Undo changes, before closing with Escape.");
+            RecordRelease(e);
+        }
+    }
+
+    /// <summary>
+    /// Unsaved engines are saved when the window closes, as every other setting already is. If
+    /// they do not pass their checks the window stays open on them and says why, rather than
+    /// dropping the change; only quitting Hail lets them go.
+    /// </summary>
+    private void OnClosing(object? sender, CancelEventArgs e)
+    {
+        if (!SaveEnginesButton.IsEnabled || SaveEngines() || _quitting)
+        {
             return;
         }
 
-        Close();
+        e.Cancel = true;
+        ShowSection(SettingsSection.WebSearch);
+        EngineProblem.Text += " Fix it, or choose Undo changes to close without them.";
     }
 
     /// <summary>While recording, Alt+Space must reach the recorder, not open the window's own menu.</summary>

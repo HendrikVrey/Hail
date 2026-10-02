@@ -34,8 +34,10 @@ history and plugins stay in `%LOCALAPPDATA%\Hail` until you delete that folder.
   nor opened: each keystroke would reach the server.
 - **Sums** as you type: `15% of 240`, `2^10`, `sqrt(2)`, `2pi`, `0xFF + 1`. Start with `=` to
   force it. Your region's decimal separator works (`0,1 + 0,2`), and so does the point.
-- **Web search**: a keyword first picks the engine (`g`, `ddg`, `b`, `yt`, `gh`, `w`), and
-  every box ends with *Search Google for ...* when nothing else answered it better.
+- **Web search**: a keyword and a space pick the engine (`g`, `ddg`, `b`, `yt`, `gh`, `w`). The
+  keyword leaves the box and the engine's name sits beside it, so `g cats` reads *Google* `cats`;
+  Backspace at the start of the box takes it away. Every box ends with *Search Google for ...*
+  when nothing else answered it better.
 - **Commands**: Lock, Sleep, Sign out, Restart, Shut down, Hail settings, Quit Hail. Anything
   that can cost unsaved work asks first, in the box.
 - **History**: what you pick is favoured the next time you type the same start, and an empty
@@ -53,6 +55,7 @@ history and plugins stay in `%LOCALAPPDATA%\Hail` until you delete that folder.
 | Ctrl+C | Copy the highlighted file's path (or the box's selected text) |
 | Ctrl+Shift+C | Copy the highlighted file itself |
 | Tab | Complete a path or a sum into the box |
+| Backspace, at the start | Take away the engine (or calculator) beside the box |
 | Ctrl+, | Open Hail's settings |
 | Escape | Go back from a question, or hide the box |
 

@@ -40,7 +40,7 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
     private const int RecentCandidates = 16;
 
     /// <summary>A row's icon, in device-independent pixels.</summary>
-    private const int IconSize = 32;
+    private const int IconSize = 24;
 
     /// <summary>How long Enter pressed on the previous text's rows waits for the current text's.</summary>
     private static readonly TimeSpan EnterWait = TimeSpan.FromSeconds(3);
@@ -63,6 +63,7 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
     private Dictionary<ProviderResult, ResultRow> _rowsByResult = new(ReferenceEqualityComparer.Instance);
     private CancellationTokenSource? _query;
     private ParsedQuery _current;
+    private ProviderKeyword? _chip;
     private bool _listIsCurrent = true;
     private TaskCompletionSource<bool> _ready = Settled(true);
     private Confirmation? _confirmation;
@@ -133,6 +134,13 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
 
     public bool HasScope => _scope is not null;
 
+    /// <summary>
+    /// The keyword turned into a chip: typing <c>g</c> and a space takes the <c>g</c> out of the
+    /// box and shows Google beside it, and everything typed after is a Google search until
+    /// Backspace at the start of the box takes the chip away. Null when there is none.
+    /// </summary>
+    public ProviderKeyword? Chip => _chip;
+
     /// <summary>The highlighted row's other actions and their chords (Hail.md §10.1).</summary>
     public IReadOnlyList<ActionHint> Footer
     {
@@ -166,13 +174,45 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
         && (gesture == Gesture.Enter || selected.Secondary.Any(a => a.Gesture == gesture));
 
     /// <summary>
-    /// Runs a query for <paramref name="text"/>, streaming what the providers find into the
-    /// rows. An empty box shows the results picked most, from history.
+    /// Turns a keyword finished at the start of <paramref name="text"/> into the chip. True when
+    /// it did, with <paramref name="rest"/> the text the box should hold now; false, and the text
+    /// unchanged, when there was none or a chip is already showing.
+    /// </summary>
+    public bool TryTakeChip(string text, out string rest)
+    {
+        rest = text;
+        if (_chip is not null || _parser.TakeKeyword(text, out var left) is not { } keyword)
+        {
+            return false;
+        }
+
+        _chip = keyword;
+        rest = left;
+        Scope = keyword.Label;
+        return true;
+    }
+
+    /// <summary>Takes the chip away, so the box's text is searched everywhere again. False when there was none.</summary>
+    public bool RemoveChip()
+    {
+        if (_chip is null)
+        {
+            return false;
+        }
+
+        _chip = null;
+        Scope = null;
+        return true;
+    }
+
+    /// <summary>
+    /// Runs a query for <paramref name="text"/> (behind the chip, when one shows), streaming what
+    /// the providers find into the rows. An empty box shows the results picked most, from history.
     /// </summary>
     public async Task SearchAsync(string text)
     {
         var cancel = BeginQuery();
-        var parsed = _parser.Parse(text);
+        var parsed = _parser.Parse(_chip is null ? text : QueryParser.Compose(_chip, text));
         _current = parsed;
         Scope = parsed.Scope?.Label;
 
@@ -283,19 +323,26 @@ internal sealed class SearchViewModel : INotifyPropertyChanged
     /// </summary>
     public void ProvidersReplaced()
     {
+        // A chip stays while some provider still answers to its keyword, so a box kept open
+        // with "Google" beside it does not silently become a search of everything.
+        var chip = _chip;
         _parser = new QueryParser(_supervisor.Providers);
         _rowsByResult = new Dictionary<ProviderResult, ResultRow>(ReferenceEqualityComparer.Instance);
         _confirmation = null;
         Raise(nameof(IsConfirming));
         Reset();
+
+        _chip = chip is null ? null : _parser.FindKeyword(chip.Keyword);
+        Scope = _chip?.Label;
     }
 
-    /// <summary>Forgets the query and its rows, for the next time the box is summoned.</summary>
+    /// <summary>Forgets the query, its rows and the chip, for the next time the box is summoned.</summary>
     public void Reset()
     {
         BeginQuery();
         _ready.TrySetResult(false);
         _current = _parser.Parse(string.Empty);
+        _chip = null;
         Scope = null;
         _list.Clear();
         _listIsCurrent = true;

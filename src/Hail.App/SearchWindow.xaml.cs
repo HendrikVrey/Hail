@@ -25,6 +25,7 @@ internal sealed partial class SearchWindow : Window
     private nint _handle;
     private bool _quitting;
     private bool _resetting;
+    private bool _rewriting;
 
     public SearchWindow(SearchViewModel model, IHostLog log, bool keepLastQuery)
     {
@@ -115,13 +116,14 @@ internal sealed partial class SearchWindow : Window
             _resetting = false;
         }
 
-        Placeholder.Visibility = Visibility.Visible;
         _model.Reset();
+        UpdatePlaceholder();
     }
 
     /// <summary>Searches the box's text again, if the box is showing: the providers have changed under it.</summary>
     public void Refresh()
     {
+        UpdatePlaceholder();
         if (IsVisible)
         {
             _ = SearchAsync(SearchBox.Text);
@@ -163,6 +165,11 @@ internal sealed partial class SearchWindow : Window
         source.AddHook(Hook);
 
         WindowEffects.MakeToolWindow(_handle);
+
+        // The frame is extended under a transparent client area for the backdrop, so the
+        // caption buttons Windows draws for a window with a system menu would show through it:
+        // a close button in the corner of the box, red under the mouse. The box has no caption.
+        WindowEffects.RemoveCaptionButtons(_handle);
         ApplyTheme();
 
         if (WindowEffects.TryApplyTransientBackdrop(_handle))
@@ -195,11 +202,58 @@ internal sealed partial class SearchWindow : Window
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        Placeholder.Visibility = SearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Hidden;
+        if (!_rewriting)
+        {
+            OnTextEdited();
+        }
+    }
+
+    private void OnTextEdited()
+    {
+        // "g " (or "=") finished at the start becomes the chip, and leaves the box with only
+        // what follows it: the user sees the scope beside the field instead of a stray letter.
+        if (!_resetting && _model.TryTakeChip(SearchBox.Text, out var rest))
+        {
+            Rewrite(rest);
+        }
+
+        UpdatePlaceholder();
         if (!_resetting)
         {
             _ = SearchAsync(SearchBox.Text);
         }
+    }
+
+    /// <summary>Puts <paramref name="text"/> in the field without it counting as typing; the caret goes to its end.</summary>
+    private void Rewrite(string text)
+    {
+        _rewriting = true;
+        try
+        {
+            SearchBox.Text = text;
+            SearchBox.CaretIndex = text.Length;
+        }
+        finally
+        {
+            _rewriting = false;
+        }
+    }
+
+    /// <summary>The hint shows only in an empty field with no chip; with a chip, the row under it says what to type.</summary>
+    private void UpdatePlaceholder() =>
+        Placeholder.Visibility = SearchBox.Text.Length == 0 && _model.Chip is null ? Visibility.Visible : Visibility.Hidden;
+
+    /// <summary>Backspace at the very start of the field takes the chip away and searches the text everywhere.</summary>
+    private bool TryRemoveChip()
+    {
+        if (SearchBox.CaretIndex != 0 || SearchBox.SelectionLength != 0 || !_model.RemoveChip())
+        {
+            return false;
+        }
+
+        UpdatePlaceholder();
+        _ = SearchAsync(SearchBox.Text);
+        return true;
     }
 
     private async Task SearchAsync(string text)
@@ -265,6 +319,10 @@ internal sealed partial class SearchWindow : Window
                 Complete();
                 break;
 
+            case Key.Back when modifiers == ModifierKeys.None && TryRemoveChip():
+                e.Handled = true;
+                break;
+
             case Key.OemComma when ctrl:
                 e.Handled = true;
                 Dismiss();
@@ -299,9 +357,23 @@ internal sealed partial class SearchWindow : Window
         }
     }
 
+    /// <summary>
+    /// Replaces the whole query (a completion, "keep calculating"): the text given is what would
+    /// be typed, keyword and all, so the chip goes and is made again from it if it starts with one.
+    /// </summary>
     private void SetText(string text)
     {
-        SearchBox.Text = text;
+        _model.RemoveChip();
+        if (SearchBox.Text == text)
+        {
+            // No change, so no TextChanged: the chip is made again and the search run here.
+            OnTextEdited();
+        }
+        else
+        {
+            SearchBox.Text = text;
+        }
+
         SearchBox.CaretIndex = SearchBox.Text.Length;
     }
 

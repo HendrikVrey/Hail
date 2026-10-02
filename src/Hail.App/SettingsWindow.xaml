@@ -5,16 +5,18 @@
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
   xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
   Title="Hail settings"
-  Width="880"
-  Height="700"
-  MinWidth="660"
-  MinHeight="480"
+  Width="760"
+  Height="560"
+  MinWidth="600"
+  MinHeight="420"
   ExtendsContentIntoTitleBar="True"
   WindowBackdropType="Mica"
   WindowCornerPreference="Round"
   WindowStartupLocation="CenterScreen"
   FontFamily="{StaticResource BoxFont}"
-  PreviewKeyDown="Window_PreviewKeyDown">
+  FontSize="13"
+  PreviewKeyDown="Window_PreviewKeyDown"
+  PreviewKeyUp="Window_PreviewKeyUp">
 
   <!--
     Hail's settings (Hail.md §10.4), laid out as Windows' own Settings is: sections down the
@@ -24,60 +26,60 @@
   <Window.Resources>
     <Style x:Key="SectionTitle" TargetType="TextBlock">
       <Setter Property="FontFamily" Value="{StaticResource BoxDisplayFont}" />
-      <Setter Property="FontSize" Value="28" />
+      <Setter Property="FontSize" Value="20" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Margin" Value="0,0,0,6" />
+      <Setter Property="Margin" Value="0,2,0,10" />
       <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
     </Style>
     <Style x:Key="Intro" TargetType="TextBlock">
-      <Setter Property="FontSize" Value="14" />
-      <Setter Property="Margin" Value="0,0,0,16" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Margin" Value="0,0,0,12" />
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
     </Style>
     <Style x:Key="Card" TargetType="Border">
-      <Setter Property="Padding" Value="18,14" />
-      <Setter Property="Margin" Value="0,0,0,4" />
-      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="14,9" />
+      <Setter Property="Margin" Value="0,0,0,3" />
+      <Setter Property="CornerRadius" Value="5" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
     </Style>
     <Style x:Key="CardTitle" TargetType="TextBlock">
-      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontSize" Value="13" />
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
     </Style>
     <Style x:Key="CardText" TargetType="TextBlock">
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="Margin" Value="0,2,0,0" />
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="Margin" Value="0,1,0,0" />
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
     </Style>
     <Style x:Key="GroupLabel" TargetType="TextBlock">
-      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontSize" Value="13" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Margin" Value="0,20,0,8" />
+      <Setter Property="Margin" Value="0,14,0,6" />
       <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
     </Style>
     <Style x:Key="Problem" TargetType="TextBlock">
-      <Setter Property="FontSize" Value="13" />
-      <Setter Property="Margin" Value="2,6,0,4" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Margin" Value="2,4,0,6" />
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="Visibility" Value="Collapsed" />
       <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
     </Style>
     <Style x:Key="Note" TargetType="TextBlock">
-      <Setter Property="FontSize" Value="13" />
-      <Setter Property="Margin" Value="2,6,0,4" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Margin" Value="2,4,0,6" />
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="Visibility" Value="Collapsed" />
       <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
     </Style>
     <Style x:Key="NavGlyph" TargetType="TextBlock">
       <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
-      <Setter Property="FontSize" Value="16" />
-      <Setter Property="Width" Value="28" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="Width" Value="24" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style x:Key="SectionPanel" TargetType="StackPanel">
@@ -92,7 +94,7 @@
     -->
     <Style x:Key="NavItem" TargetType="ListBoxItem">
       <Setter Property="Margin" Value="0,1" />
-      <Setter Property="Padding" Value="12,9" />
+      <Setter Property="Padding" Value="10,6" />
       <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
       <Setter Property="Template">
         <Setter.Value>
@@ -108,7 +110,7 @@
               <Border
                 x:Name="Pill"
                 Width="3"
-                Height="16"
+                Height="14"
                 HorizontalAlignment="Left"
                 Background="{DynamicResource AccentFillColorDefaultBrush}"
                 CornerRadius="1.5"
@@ -139,13 +141,13 @@
 
     <Grid Grid.Row="1">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="210" />
+        <ColumnDefinition Width="172" />
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
 
       <ListBox
         x:Name="Nav"
-        Margin="10,6,4,12"
+        Margin="8,4,4,10"
         AutomationProperties.Name="Sections"
         Background="Transparent"
         BorderThickness="0"
@@ -198,7 +200,8 @@
       <ScrollViewer
         x:Name="Scroller"
         Grid.Column="1"
-        Padding="20,4,28,28"
+        FocusVisualStyle="{x:Null}"
+        Padding="16,2,20,20"
         VerticalScrollBarVisibility="Auto">
         <Grid>
 
@@ -212,13 +215,13 @@
                   <Border x:Name="HotkeyCap" Style="{StaticResource KeycapStyle}">
                     <TextBlock
                       x:Name="HotkeyText"
-                      FontSize="14"
+                      FontSize="13"
                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                   </Border>
                   <ui:Button
                     x:Name="ChangeHotkeyButton"
-                    MinWidth="88"
-                    Margin="12,0,0,0"
+                    MinWidth="76"
+                    Margin="10,0,0,0"
                     Click="ChangeHotkey_Click"
                     Content="Change" />
                 </StackPanel>
@@ -229,6 +232,7 @@
               </DockPanel>
             </Border>
             <TextBlock x:Name="HotkeyProblem" Style="{StaticResource Problem}" />
+            <TextBlock x:Name="HotkeyNote" Style="{StaticResource Note}" />
 
             <Border Style="{StaticResource Card}">
               <DockPanel>
@@ -282,7 +286,9 @@
               <DockPanel>
                 <ComboBox
                   x:Name="DefaultEngine"
-                  MinWidth="200"
+                  MinWidth="170"
+                  Padding="10,5,10,6"
+                  FontSize="13"
                   AutomationProperties.Name="The engine the last row searches with"
                   DisplayMemberPath="Name"
                   DockPanel.Dock="Right"
@@ -295,10 +301,10 @@
             </Border>
 
             <TextBlock Style="{StaticResource GroupLabel}" Text="Engines" />
-            <Grid Margin="2,0,52,6">
+            <Grid Margin="2,0,42,4">
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="150" />
-                <ColumnDefinition Width="90" />
+                <ColumnDefinition Width="128" />
+                <ColumnDefinition Width="76" />
                 <ColumnDefinition Width="*" />
               </Grid.ColumnDefinitions>
               <TextBlock Style="{StaticResource CardText}" Text="Name" />
@@ -308,39 +314,48 @@
             <ItemsControl x:Name="EngineRows">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <Grid Margin="0,0,0,6">
+                  <Grid Margin="0,0,0,4">
                     <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="150" />
-                      <ColumnDefinition Width="90" />
+                      <ColumnDefinition Width="128" />
+                      <ColumnDefinition Width="76" />
                       <ColumnDefinition Width="*" />
                       <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <ui:TextBox
                       AutomationProperties.Name="Engine name"
+                      ClearButtonEnabled="False"
+                      Padding="9,5,9,6"
+                      FontSize="13"
                       MaxLength="40"
                       Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
                     <ui:TextBox
                       Grid.Column="1"
                       Margin="8,0,0,0"
                       AutomationProperties.Name="Engine keyword"
+                      ClearButtonEnabled="False"
+                      Padding="9,5,9,6"
+                      FontSize="13"
                       MaxLength="12"
                       Text="{Binding Keyword, UpdateSourceTrigger=PropertyChanged}" />
                     <ui:TextBox
                       Grid.Column="2"
                       Margin="8,0,0,0"
                       AutomationProperties.Name="Engine address"
+                      ClearButtonEnabled="False"
+                      Padding="9,5,9,6"
+                      FontSize="13"
                       MaxLength="2048"
                       Text="{Binding Template, UpdateSourceTrigger=PropertyChanged}" />
                     <ui:Button
                       Grid.Column="3"
-                      Width="40"
-                      Height="34"
+                      Width="34"
+                      Height="30"
                       Margin="8,0,0,0"
                       Padding="0"
                       AutomationProperties.Name="Remove this engine"
                       Click="RemoveEngine_Click"
                       ToolTip="Remove this engine">
-                      <TextBlock FontFamily="{StaticResource IconFont}" FontSize="14" Text="&#xE74D;" />
+                      <TextBlock FontFamily="{StaticResource IconFont}" FontSize="12" Text="&#xE74D;" />
                     </ui:Button>
                   </Grid>
                 </DataTemplate>
@@ -353,17 +368,17 @@
               Content="Add engine" />
             <TextBlock x:Name="EngineProblem" Style="{StaticResource Problem}" />
             <TextBlock x:Name="EngineNote" Style="{StaticResource Note}" />
-            <StackPanel Margin="0,14,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+            <StackPanel Margin="0,10,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
               <ui:Button
                 x:Name="SaveEnginesButton"
-                MinWidth="120"
+                MinWidth="100"
                 Appearance="Primary"
                 Click="SaveEngines_Click"
                 Content="Save engines"
                 IsEnabled="False" />
               <ui:Button
                 x:Name="UndoEnginesButton"
-                MinWidth="120"
+                MinWidth="100"
                 Margin="8,0,0,0"
                 Click="UndoEngines_Click"
                 Content="Undo changes"
@@ -382,7 +397,7 @@
                 <TextBlock Style="{StaticResource CardText}" Text="Copy a plugin's folder into the plugins folder, then press Reload plugins." />
               </StackPanel>
             </Border>
-            <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+            <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
               <ui:Button Click="OpenPluginsFolder_Click" Content="Open plugins folder" />
               <ui:Button
                 x:Name="ReloadPluginsButton"
@@ -400,7 +415,7 @@
               <DockPanel>
                 <ui:Button
                   x:Name="ClearHistoryButton"
-                  MinWidth="120"
+                  MinWidth="100"
                   Click="ClearHistory_Click"
                   Content="Clear history"
                   DockPanel.Dock="Right" />
@@ -440,23 +455,23 @@
                 <ProgressBar
                   x:Name="UpdateProgress"
                   Height="4"
-                  Margin="0,12,0,0"
+                  Margin="0,10,0,0"
                   Maximum="1"
                   Visibility="Collapsed" />
-                <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
                   <ui:Button
                     x:Name="UpdatePrimaryButton"
-                    MinWidth="112"
+                    MinWidth="96"
                     Appearance="Primary"
                     Click="UpdatePrimary_Click" />
                   <ui:Button
                     x:Name="UpdateSecondaryButton"
-                    MinWidth="96"
+                    MinWidth="84"
                     Margin="8,0,0,0"
                     Click="UpdateSecondary_Click" />
                   <ui:Button
                     x:Name="UpdateTertiaryButton"
-                    MinWidth="96"
+                    MinWidth="84"
                     Margin="8,0,0,0"
                     Click="UpdateTertiary_Click" />
                 </StackPanel>
@@ -464,7 +479,7 @@
             </Border>
 
             <ui:Button
-              Margin="0,12,0,0"
+              Margin="0,8,0,0"
               Appearance="Transparent"
               Click="Releases_Click"
               Content="Every release, on GitHub" />
@@ -477,15 +492,15 @@
               <StackPanel>
                 <StackPanel Orientation="Horizontal">
                   <Image
-                    Width="40"
-                    Height="40"
-                    Margin="0,0,14,0"
+                    Width="32"
+                    Height="32"
+                    Margin="0,0,12,0"
                     Source="pack://application:,,,/Hail;component/hail.png"
                     RenderOptions.BitmapScalingMode="HighQuality" />
                   <StackPanel VerticalAlignment="Center">
                     <TextBlock
                       FontFamily="{StaticResource BoxDisplayFont}"
-                      FontSize="20"
+                      FontSize="16"
                       FontWeight="SemiBold"
                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                       Text="Hail" />
@@ -493,13 +508,13 @@
                   </StackPanel>
                 </StackPanel>
                 <TextBlock
-                  Margin="0,14,0,0"
+                  Margin="0,10,0,0"
                   Style="{StaticResource CardText}"
-                  FontSize="13"
+                  FontSize="12"
                   Text="A keyboard launcher for Windows, by Hendrik Vrey. Free to use, including at work; not open source. The plugin contract, the plugin template and guide, and the Everything plugin are MIT licensed, so anyone can write and publish plugins." />
               </StackPanel>
             </Border>
-            <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
+            <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
               <ui:Button Click="OpenDataFolder_Click" Content="Open Hail's folder" />
               <ui:Button
                 Margin="8,0,0,0"

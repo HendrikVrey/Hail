@@ -5,7 +5,7 @@
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
   xmlns:local="clr-namespace:Hail.App"
   Title="Hail"
-  Width="680"
+  Width="600"
   SizeToContent="Height"
   WindowStyle="SingleBorderWindow"
   ResizeMode="NoResize"
@@ -37,10 +37,10 @@
     <BooleanToVisibilityConverter x:Key="Visible" />
   </Window.Resources>
 
-  <Border x:Name="Surface" Padding="8,4,8,8">
+  <Border x:Name="Surface" Padding="6,2,6,6">
     <StackPanel>
 
-      <Grid Height="56" Margin="8,0">
+      <Grid Height="46" Margin="8,0">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
@@ -49,10 +49,10 @@
 
         <TextBlock
           FontFamily="{StaticResource IconFont}"
-          FontSize="20"
+          FontSize="16"
           Text="&#xE721;"
           VerticalAlignment="Center"
-          Margin="2,2,14,0"
+          Margin="2,1,12,0"
           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
         <!-- The keyword in force: "g" shows Google, so the user sees the scope they are in. -->
@@ -63,7 +63,7 @@
           Visibility="{Binding HasScope, Converter={StaticResource Visible}}">
           <TextBlock
             Text="{Binding Scope}"
-            FontSize="13"
+            FontSize="12"
             FontWeight="SemiBold"
             Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
         </Border>
@@ -73,7 +73,7 @@
             x:Name="Placeholder"
             Text="Search apps, files and the web, or type a sum"
             FontFamily="{StaticResource BoxDisplayFont}"
-            FontSize="22"
+            FontSize="18"
             Margin="2,0,0,0"
             VerticalAlignment="Center"
             TextTrimming="CharacterEllipsis"
@@ -89,13 +89,13 @@
 
       <Border
         Height="1"
-        Margin="-8,0,-8,0"
+        Margin="-6,0,-6,0"
         Background="{DynamicResource DividerStrokeColorDefaultBrush}"
         Visibility="{Binding HasContent, Converter={StaticResource Visible}}" />
 
       <ItemsControl
         x:Name="Rows"
-        Margin="0,6,0,0"
+        Margin="0,4,0,0"
         ItemsSource="{Binding Rows}"
         Focusable="False"
         Visibility="{Binding HasRows, Converter={StaticResource Visible}}">
@@ -103,8 +103,8 @@
           <DataTemplate DataType="{x:Type local:ResultRow}">
             <Border
               x:Name="Row"
-              Height="48"
-              CornerRadius="6"
+              Height="38"
+              CornerRadius="5"
               Background="Transparent"
               Cursor="Hand"
               MouseMove="Row_MouseMove"
@@ -120,13 +120,13 @@
                 <Border
                   x:Name="Pill"
                   Width="3"
-                  Height="16"
+                  Height="14"
                   CornerRadius="1.5"
                   HorizontalAlignment="Left"
                   Background="{DynamicResource AccentFillColorDefaultBrush}"
                   Visibility="Hidden" />
 
-                <Grid Width="32" Height="32" Margin="12,0,12,0">
+                <Grid Width="24" Height="24" Margin="10,0,10,0">
                   <Image
                     x:Name="IconImage"
                     Source="{Binding Icon}"
@@ -135,7 +135,7 @@
                     x:Name="IconGlyph"
                     Text="{Binding Glyph}"
                     FontFamily="{StaticResource IconFont}"
-                    FontSize="22"
+                    FontSize="17"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
                     Visibility="Collapsed"
@@ -145,12 +145,12 @@
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                   <TextBlock
                     local:HighlightedTitle.Row="{Binding}"
-                    FontSize="15"
+                    FontSize="14"
                     TextTrimming="CharacterEllipsis"
                     Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                   <TextBlock
                     Text="{Binding Subtitle}"
-                    FontSize="12"
+                    FontSize="11"
                     TextTrimming="CharacterEllipsis"
                     Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                     Visibility="{Binding HasSubtitle, Converter={StaticResource Visible}}" />
@@ -160,7 +160,7 @@
                   x:Name="Hint"
                   Grid.Column="2"
                   Orientation="Horizontal"
-                  Margin="12,0,12,0"
+                  Margin="10,0,10,0"
                   Visibility="Collapsed">
                   <TextBlock
                     Text="{Binding ActionTitle}"
@@ -200,8 +200,8 @@
 
       <TextBlock
         Text="{Binding Status}"
-        FontSize="13"
-        Margin="14,10,14,6"
+        FontSize="12"
+        Margin="12,8,12,4"
         TextWrapping="Wrap"
         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
         Visibility="{Binding HasStatus, Converter={StaticResource Visible}}" />
@@ -209,7 +209,7 @@
       <!-- The highlighted row's other actions, each with its chord: the keymap made findable. -->
       <ItemsControl
         x:Name="Footer"
-        Margin="12,6,12,0"
+        Margin="10,4,10,0"
         ItemsSource="{Binding Footer}"
         Focusable="False"
         Visibility="{Binding HasFooter, Converter={StaticResource Visible}}">

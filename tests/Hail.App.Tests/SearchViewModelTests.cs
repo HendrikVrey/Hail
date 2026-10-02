@@ -257,6 +257,85 @@ public sealed class SearchViewModelTests
         });
     }
 
+    [Fact]
+    public void A_finished_keyword_becomes_a_chip_and_what_follows_is_searched_behind_it()
+    {
+        Ui.Run(async () =>
+        {
+            using var box = WithGoogle();
+
+            Assert.False(box.Model.TryTakeChip("g", out _));
+            Assert.True(box.Model.TryTakeChip("g ", out var rest));
+            Assert.Equal(string.Empty, rest);
+            Assert.Equal("Google", box.Model.Scope);
+            Assert.Equal("g", box.Model.Chip?.Keyword);
+
+            await box.Model.SearchAsync("cats");
+            Assert.Equal(["web cats"], box.Model.Rows.Select(r => r.Title));
+
+            // One chip at a time: "g dogs" typed behind Google is a Google search for it.
+            Assert.False(box.Model.TryTakeChip("g dogs", out _));
+            await box.Model.SearchAsync("g dogs");
+            Assert.Equal(["web g dogs"], box.Model.Rows.Select(r => r.Title));
+        });
+    }
+
+    [Fact]
+    public void Removing_the_chip_searches_the_text_everywhere_again()
+    {
+        Ui.Run(async () =>
+        {
+            using var box = WithGoogle();
+            Assert.True(box.Model.TryTakeChip("g cats", out var rest));
+            Assert.Equal("cats", rest);
+
+            Assert.True(box.Model.RemoveChip());
+            await box.Model.SearchAsync(rest);
+
+            Assert.Null(box.Model.Scope);
+            Assert.Contains("app cats", box.Model.Rows.Select(r => r.Title));
+            Assert.False(box.Model.RemoveChip());
+        });
+    }
+
+    [Fact]
+    public void The_chip_goes_when_the_box_resets_and_stays_over_new_providers_that_answer_to_it()
+    {
+        Ui.Run(async () =>
+        {
+            using var box = WithGoogle();
+            box.Model.TryTakeChip("g ", out _);
+
+            box.Model.ProvidersReplaced();
+            Assert.Equal("Google", box.Model.Scope);
+            await box.Model.SearchAsync("cats");
+            Assert.Equal(["web cats"], box.Model.Rows.Select(r => r.Title));
+
+            box.Supervisor.Replace([box.Registration("apps", Rows(q => [Row($"app {q.Search}")]))]);
+            box.Model.ProvidersReplaced();
+            Assert.Null(box.Model.Chip);
+
+            box.Model.Reset();
+            Assert.Null(box.Model.Scope);
+        });
+    }
+
+    private Box WithGoogle()
+    {
+        var box = new Box();
+        box.Supervisor.Replace(
+        [
+            box.Registration("apps", Rows(q => [Row($"app {q.Search}")])),
+            box.Registration("web", Rows(q => [Row($"web {q.Search}")]), keyword: "g") with
+            {
+                Keywords = [new ProviderKeyword("g", "Google")],
+                IsGlobal = false,
+            },
+        ]);
+        box.Model.ProvidersReplaced();
+        return box;
+    }
+
     private ValueTask<ActionOutcome> Ran(string what)
     {
         lock (_ran)

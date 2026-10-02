@@ -155,7 +155,7 @@ internal sealed partial class HailHost(SingleInstance instance, FileLog log, Hai
         }
 
         SaveHistoryNow("quitting", onlyIfChanged: true);
-        _settingsWindow?.Close();
+        _settingsWindow?.CloseForQuit();
         ShutDownPlugins();
         _updateService?.Dispose();
 

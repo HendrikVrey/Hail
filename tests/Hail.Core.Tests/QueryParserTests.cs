@@ -113,6 +113,51 @@ public sealed class QueryParserTests
         Assert.True(_parser.Parse(text).IsEmpty);
     }
 
+    [Theory]
+    [InlineData("g ", "g", "")]
+    [InlineData("g cats", "g", "cats")]
+    [InlineData("  G   cats and dogs ", "g", "cats and dogs ")]
+    [InlineData("gh hail", "gh", "hail")]
+    [InlineData("=", "=", "")]
+    [InlineData("= 2+2", "=", "2+2")]
+    public void A_finished_keyword_is_taken_off_the_front(string text, string keyword, string rest)
+    {
+        Assert.Equal(keyword, _parser.TakeKeyword(text, out var left)?.Keyword);
+        Assert.Equal(rest, left);
+    }
+
+    [Theory]
+    [InlineData("g")]
+    [InlineData("gh")]
+    [InlineData("games")]
+    [InlineData("cats g ")]
+    [InlineData("")]
+    public void Text_without_a_finished_keyword_is_left_alone(string text)
+    {
+        Assert.Null(_parser.TakeKeyword(text, out var left));
+        Assert.Equal(text, left);
+    }
+
+    [Theory]
+    [InlineData("g", "cats", "g cats")]
+    [InlineData("g", "", "g ")]
+    [InlineData("=", "2+2", "=2+2")]
+    public void A_chip_and_its_text_compose_back_into_what_would_be_typed(string keyword, string rest, string typed)
+    {
+        var chip = _parser.FindKeyword(keyword)!;
+        var composed = QueryParser.Compose(chip, rest);
+
+        Assert.Equal(typed, composed);
+        Assert.Equal(chip, _parser.Parse(composed).Scope);
+    }
+
+    [Fact]
+    public void A_keyword_no_provider_answers_to_is_not_found()
+    {
+        Assert.Null(_parser.FindKeyword("yt"));
+        Assert.Equal("Google", _parser.FindKeyword("G")?.Label);
+    }
+
     [Fact]
     public void The_raw_text_is_kept_exactly()
     {

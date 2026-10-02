@@ -83,6 +83,45 @@ public sealed class QueryParser
         return new ParsedQuery(rawText, targets, Scope: null);
     }
 
+    /// <summary>
+    /// The keyword the user has finished typing at the start of <paramref name="text"/>, so the
+    /// box can turn it into a chip: <c>g cats</c> gives Google and <c>cats</c>, <c>g </c> gives
+    /// Google and nothing, <c>=2+2</c> gives the calculator and <c>2+2</c>. Null when the text
+    /// does not start with one, and <paramref name="rest"/> is then the text unchanged.
+    /// </summary>
+    public ProviderKeyword? TakeKeyword(string text, out string rest)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        var trimmed = text.TrimStart();
+        foreach (var (keyword, _) in _keywords)
+        {
+            if (Scopes(keyword, trimmed, out _))
+            {
+                rest = trimmed[keyword.Keyword.Length..].TrimStart();
+                return keyword;
+            }
+        }
+
+        rest = text;
+        return null;
+    }
+
+    /// <summary>The keyword in force under this spelling, or null; for a chip kept across a change of providers.</summary>
+    public ProviderKeyword? FindKeyword(string keyword) =>
+        _keywords.Select(k => k.Keyword).FirstOrDefault(k => string.Equals(k.Keyword, keyword, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// The text a chip and what follows it stand for, as it would be typed: <c>g cats</c>,
+    /// <c>=2+2</c>. Parsing it scopes the query to the chip's provider.
+    /// </summary>
+    public static string Compose(ProviderKeyword keyword, string rest)
+    {
+        ArgumentNullException.ThrowIfNull(keyword);
+        ArgumentNullException.ThrowIfNull(rest);
+        return keyword.NeedsSpace ? $"{keyword.Keyword} {rest}" : keyword.Keyword + rest;
+    }
+
     private static bool Scopes(ProviderKeyword keyword, string text, out string search)
     {
         search = string.Empty;

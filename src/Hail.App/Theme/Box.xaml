@@ -17,7 +17,7 @@
 
   <Style x:Key="SearchBoxStyle" TargetType="TextBox">
     <Setter Property="FontFamily" Value="{StaticResource BoxDisplayFont}" />
-    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontSize" Value="18" />
     <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
     <Setter Property="CaretBrush" Value="{DynamicResource TextFillColorPrimaryBrush}" />
     <Setter Property="SelectionBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
